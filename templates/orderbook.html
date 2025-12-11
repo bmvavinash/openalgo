@@ -161,9 +161,15 @@
                     <td class="numeric-cell">{{ order.quantity }}</td>
                     <td class="numeric-cell">
                         {% if order.pricetype|upper == 'MARKET' %}
-                            0.00
+                            {% if order.average_price and order.average_price > 0 %}
+                                {{ "%.2f"|format(order.average_price) }}
+                            {% elif order.price and order.price > 0 %}
+                                {{ "%.2f"|format(order.price) }}
+                            {% else %}
+                                0.00
+                            {% endif %}
                         {% else %}
-                            {{ order.price }}
+                            {{ "%.2f"|format(order.price) if order.price else "0.00" }}
                         {% endif %}
                     </td>
                     <td class="numeric-cell">{{ order.trigger_price }}</td>
@@ -323,7 +329,7 @@ function cancelAllOrders() {
             // Create a form and submit it to force a clean GET request
             const form = document.createElement('form');
             form.method = 'GET';
-            form.action = '/orderbook';
+            form.action = '/orders/orderbook';
             document.body.appendChild(form);
             form.submit();
         }, 10000); // 10 seconds delay to ensure rate limit is respected

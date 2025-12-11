@@ -42,6 +42,7 @@ from blueprints.telegram import telegram_bp  # Import the telegram blueprint
 from blueprints.security import security_bp  # Import the security blueprint
 from blueprints.sandbox import sandbox_bp  # Import the sandbox blueprint
 from blueprints.playground import playground_bp  # Import the API playground blueprint
+from blueprints.marketwatch import marketwatch_bp  # Import the Market Watch blueprint
 from services.telegram_bot_service import telegram_bot_service
 from database.telegram_db import get_bot_config
 
@@ -137,7 +138,8 @@ def create_app():
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE='Lax',
         SESSION_COOKIE_SECURE=USE_HTTPS,
-        SESSION_COOKIE_NAME=session_cookie_name
+        SESSION_COOKIE_NAME=session_cookie_name,
+        SESSION_COOKIE_PATH='/',  # Ensure cookie is available for all paths
         # PERMANENT_SESSION_LIFETIME is dynamically set at login to expire at 3:30 AM IST
     )
     
@@ -210,6 +212,7 @@ def create_app():
     app.register_blueprint(security_bp)  # Register Security blueprint
     app.register_blueprint(sandbox_bp)  # Register Sandbox blueprint
     app.register_blueprint(playground_bp)  # Register API playground blueprint
+    app.register_blueprint(marketwatch_bp)  # Register Market Watch blueprint
 
 
     # Exempt webhook endpoints from CSRF protection after app initialization
@@ -337,8 +340,21 @@ def create_app():
     @app.errorhandler(500)
     def internal_server_error(e):
         """Custom handler for 500 Internal Server Error"""
-        # Log the error (optional)
-        logger.error(f"Server Error: {e}")
+        import traceback
+        from flask import request
+        
+        # Log the full error with traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"500 Internal Server Error on {request.path}")
+        logger.error(f"Error: {str(e)}")
+        logger.error(f"Traceback:\n{error_traceback}")
+        
+        # Log request details
+        logger.error(f"Request method: {request.method}")
+        logger.error(f"Request URL: {request.url}")
+        logger.error(f"Request headers: {dict(request.headers)}")
+        if session:
+            logger.error(f"Session keys: {list(session.keys())}")
 
         # Provide a logout option
         return render_template("500.html"), 500

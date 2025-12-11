@@ -235,6 +235,60 @@ def get_active_broker():
 def check_master_contract_ready(skip_on_startup=False):
     """Check if master contracts are ready for the current broker"""
     try:
+        # Check if in paper trading/analysis mode - skip broker check if enabled
+        # This check should happen FIRST, before any broker checks
+        # CRITICAL: This must work even without request context
+        try:
+            from database.settings_db import get_analyze_mode
+            from flask import has_request_context, current_app
+            import os
+
+            # Multiple signals for paper/analysis mode
+            analyze_mode = False
+
+            # 1) Session flag (paper trading)
+            try:
+                if 'paper_trading_mode' in session and session.get('paper_trading_mode'):
+                    analyze_mode = True
+                    logger.info("✅ Paper trading session flag detected - skipping master contract check")
+            except Exception:
+                pass
+
+            # 2) DB setting (preferred source)
+            if not analyze_mode:
+                try:
+                    if has_request_context():
+                        analyze_mode = get_analyze_mode()
+                        logger.debug(f"Got analyze mode from request context: {analyze_mode}")
+                    else:
+                        if current_app:
+                            with current_app.app_context():
+                                analyze_mode = get_analyze_mode()
+                                logger.debug(f"Got analyze mode from app context: {analyze_mode}")
+                        else:
+                            analyze_mode = get_analyze_mode()
+                            logger.debug(f"Got analyze mode directly: {analyze_mode}")
+                except Exception as e:
+                    logger.warning(f"Error getting analyze mode: {e}")
+
+            # 3) Env fallback
+            if not analyze_mode:
+                env_mode = os.getenv("ANALYZE_MODE") or os.getenv("ANALYSIS_MODE")
+                if env_mode and str(env_mode).lower() in ["1", "true", "yes", "on"]:
+                    analyze_mode = True
+                    logger.info("✅ ANALYZE_MODE env detected - skipping master contract check")
+
+            if analyze_mode:
+                logger.info("✅ Analysis/Paper mode enabled - skipping master contract check (not needed for paper trading)")
+                return True, "Analysis mode enabled - master contract check skipped"
+            else:
+                logger.debug("Analysis mode is False - will check broker")
+        except Exception as e:
+            # Log the error but continue to broker check
+            import traceback
+            logger.error(f"Unexpected error in analyze mode check: {e}")
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+        
         # First try to get broker from session (if available)
         broker = session.get('broker') if session else None
         
@@ -826,6 +880,15 @@ def start_strategy(strategy_id):
 
     # Ensure initialization is done when starting strategies
     initialize_with_app_context()
+    
+    # Check analyze mode before starting - this ensures we have app context
+    try:
+        from database.settings_db import get_analyze_mode
+        analyze_mode = get_analyze_mode()
+        logger.info(f"Starting strategy {strategy_id} - Analysis mode: {analyze_mode}")
+    except Exception as e:
+        logger.warning(f"Could not check analyze mode: {e}")
+    
     success, message = start_strategy_process(strategy_id)
     return jsonify({'success': success, 'message': message})
 

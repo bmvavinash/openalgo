@@ -14,7 +14,7 @@ def format_decimal(value):
     return value
 
 def format_order_data(order_data):
-    """Format all numeric values in order data to 2 decimal places and adjust price for market orders, except quantity fields"""
+    """Format all numeric values in order data to 2 decimal places, except quantity fields"""
     # Fields that should remain as integers
     quantity_fields = {'quantity', 'qty', 'filledqty', 'filled_quantity', 'tradedqty', 'traded_quantity', 'pendingqty', 'pending_quantity', 'unfilledqty', 'unfilled_quantity'}
 
@@ -32,10 +32,14 @@ def format_order_data(order_data):
                 else:
                     formatted_item[key] = value
 
-            # Set price to 0 for market orders, keep actual price for limit orders
+            # For MARKET orders in sandbox mode, show the actual price (LTP/execution price)
+            # For completed MARKET orders, show average_price if price is 0
             pricetype = formatted_item.get('pricetype', '').upper()
             if pricetype == 'MARKET':
-                formatted_item['price'] = 0.0
+                # If price is 0 or None, try to use average_price (execution price)
+                if (formatted_item.get('price', 0) == 0 or formatted_item.get('price') is None) and formatted_item.get('average_price', 0) > 0:
+                    formatted_item['price'] = formatted_item['average_price']
+                # If still 0, keep it as is (will show 0 for pending MARKET orders)
 
             formatted_orders.append(formatted_item)
         return formatted_orders
@@ -176,8 +180,18 @@ def get_orderbook(
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # Check if in analyze/paper trading mode - use sandbox directly
+        from database.settings_db import get_analyze_mode
+        if get_analyze_mode():
+            logger.info(f"Paper trading mode detected - routing to sandbox for API key: {api_key[:10]}...{api_key[-4:]}")
+            from services.sandbox_service import sandbox_get_orderbook
+            original_data = {'apikey': api_key}
+            return sandbox_get_orderbook(api_key, original_data)
+        
+        # Live broker mode - get auth token
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
+            logger.warning(f"Failed to get auth token for API key: {api_key[:10]}...{api_key[-4:]}")
             return False, {
                 'status': 'error',
                 'message': 'Invalid openalgo apikey'

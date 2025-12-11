@@ -1,0 +1,8 @@
+{
+  "status_code": 400,
+  "response": {
+    "message": "MIS orders cannot be placed after square-off time (15:15 IST). Trading resumes at 09:00 AM IST.",
+    "mode": "analyze",
+    "status": "error"
+  }
+}

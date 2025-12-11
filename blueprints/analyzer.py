@@ -18,21 +18,38 @@ analyzer_bp = Blueprint('analyzer_bp', __name__, url_prefix='/analyzer')
 def format_request(req, ist):
     """Format a single request entry"""
     try:
-        request_data = json.loads(req.request_data) if isinstance(req.request_data, str) else req.request_data
-        response_data = json.loads(req.response_data) if isinstance(req.response_data, str) else req.response_data
+        # Handle request_data - could be string or dict
+        if isinstance(req.request_data, str):
+            try:
+                request_data = json.loads(req.request_data)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Invalid JSON in request_data for log {req.id}: {req.request_data[:100]}")
+                request_data = {}
+        else:
+            request_data = req.request_data if isinstance(req.request_data, dict) else {}
+        
+        # Handle response_data - could be string or dict
+        if isinstance(req.response_data, str):
+            try:
+                response_data = json.loads(req.response_data)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Invalid JSON in response_data for log {req.id}: {req.response_data[:100]}")
+                response_data = {}
+        else:
+            response_data = req.response_data if isinstance(req.response_data, dict) else {}
         
         # Base request info
         formatted_request = {
             'timestamp': req.created_at.astimezone(ist).strftime('%Y-%m-%d %H:%M:%S'),
             'api_type': req.api_type,
-            'source': request_data.get('strategy', 'Unknown'),
+            'source': request_data.get('strategy', 'Unknown') if isinstance(request_data, dict) else 'Unknown',
             'request_data': request_data,
             'response_data': response_data,  # Include complete response data
             'analysis': {
-                'issues': response_data.get('status') == 'error',
-                'error': response_data.get('message'),
-                'error_type': 'error' if response_data.get('status') == 'error' else 'success',
-                'warnings': response_data.get('warnings', [])
+                'issues': response_data.get('status') == 'error' if isinstance(response_data, dict) else False,
+                'error': response_data.get('message', '') if isinstance(response_data, dict) else '',
+                'error_type': 'error' if (isinstance(response_data, dict) and response_data.get('status') == 'error') else 'success',
+                'warnings': response_data.get('warnings', []) if isinstance(response_data, dict) else []
             }
         }
 
@@ -152,9 +169,27 @@ def analyzer():
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        # Get stats with proper structure
-        stats = get_analyzer_stats()
-        if not isinstance(stats, dict):
+        # Get stats with proper structure - wrap in try-except for safety
+        try:
+            stats = get_analyzer_stats()
+            if not isinstance(stats, dict):
+                stats = {
+                    'total_requests': 0,
+                    'sources': {},
+                    'symbols': [],
+                    'issues': {
+                        'total': 0,
+                        'by_type': {
+                            'rate_limit': 0,
+                            'invalid_symbol': 0,
+                            'missing_quantity': 0,
+                            'invalid_exchange': 0,
+                            'other': 0
+                        }
+                    }
+                }
+        except Exception as stats_error:
+            logger.error(f"Error getting analyzer stats: {str(stats_error)}\n{traceback.format_exc()}")
             stats = {
                 'total_requests': 0,
                 'sources': {},
@@ -171,8 +206,12 @@ def analyzer():
                 }
             }
 
-        # Get filtered requests
-        requests = get_filtered_requests(start_date, end_date)
+        # Get filtered requests - wrap in try-except for safety
+        try:
+            requests = get_filtered_requests(start_date, end_date)
+        except Exception as requests_error:
+            logger.error(f"Error getting filtered requests: {str(requests_error)}\n{traceback.format_exc()}")
+            requests = []
         
         return render_template('analyzer.html', 
                              requests=requests, 
@@ -182,7 +221,11 @@ def analyzer():
     except Exception as e:
         logger.error(f"Error rendering analyzer: {str(e)}\n{traceback.format_exc()}")
         flash('Error loading analyzer dashboard', 'error')
-        return redirect(url_for('core_bp.home'))
+        # Try to redirect to dashboard instead of home
+        try:
+            return redirect(url_for('dashboard_bp.dashboard'))
+        except:
+            return redirect(url_for('core_bp.home'))
 
 @analyzer_bp.route('/stats')
 @check_session_validity

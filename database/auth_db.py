@@ -344,12 +344,25 @@ def get_api_key(user_id):
 def get_api_key_for_tradingview(user_id):
     """Get decrypted API key for TradingView configuration"""
     try:
+        logger.info(f"Looking up API key for user_id: {user_id}")
         api_key_obj = ApiKeys.query.filter_by(user_id=user_id).first()
-        if api_key_obj and api_key_obj.api_key_encrypted:
-            return decrypt_token(api_key_obj.api_key_encrypted)
+        if api_key_obj:
+            logger.info(f"API key object found for user {user_id}: encrypted field exists={bool(api_key_obj.api_key_encrypted)}")
+            if api_key_obj.api_key_encrypted:
+                decrypted_key = decrypt_token(api_key_obj.api_key_encrypted)
+                if decrypted_key:
+                    logger.info(f"API key decrypted successfully for user {user_id}, length: {len(decrypted_key)}")
+                    logger.debug(f"API key first 10 chars: {decrypted_key[:10]}... (last 4: ...{decrypted_key[-4:]})")
+                else:
+                    logger.warning(f"Failed to decrypt API key for user {user_id}")
+                return decrypted_key
+            else:
+                logger.warning(f"API key object found but api_key_encrypted field is empty for user {user_id}")
+        else:
+            logger.warning(f"No API key object found in database for user_id: {user_id}")
         return None
     except Exception as e:
-        logger.error(f"Error while querying the database for API key: {e}")
+        logger.error(f"Error while querying the database for API key: {e}", exc_info=True)
         return None
 
 def verify_api_key(provided_api_key):
@@ -388,6 +401,7 @@ def verify_api_key(provided_api_key):
     try:
         # Query all API keys
         api_keys = ApiKeys.query.all()
+        logger.info(f"[verify_api_key] Checking {len(api_keys)} API keys in database. Provided key length: {len(provided_api_key)}")
 
         # Try to verify against each stored hash
         for api_key_obj in api_keys:
@@ -395,7 +409,7 @@ def verify_api_key(provided_api_key):
                 ph.verify(api_key_obj.api_key_hash, peppered_key)
                 # Valid key found - cache it
                 verified_api_key_cache[cache_key] = api_key_obj.user_id
-                logger.debug(f"API key verified and cached for user_id: {api_key_obj.user_id}")
+                logger.info(f"[verify_api_key] ✅ API key verified and cached for user_id: {api_key_obj.user_id}")
                 return api_key_obj.user_id
             except VerifyMismatchError:
                 continue
@@ -403,7 +417,7 @@ def verify_api_key(provided_api_key):
         # If we reach here, the API key is invalid
         # Cache the invalid result to prevent repeated expensive verifications
         invalid_api_key_cache[cache_key] = True
-        logger.debug(f"Invalid API key cached")
+        logger.warning(f"[verify_api_key] ❌ Invalid API key - no match found in database. Key length: {len(provided_api_key)}, first 10 chars: {provided_api_key[:10] if len(provided_api_key) >= 10 else 'N/A'}...")
 
         # Track the invalid attempt
         try:

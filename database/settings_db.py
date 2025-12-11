@@ -38,6 +38,7 @@ class Settings(Base):
     __tablename__ = 'settings'
     id = Column(Integer, primary_key=True)
     analyze_mode = Column(Boolean, default=False)  # Default to Live Mode
+    use_historical_data = Column(Boolean, default=False)  # Default to Live Data (False = live, True = historical)
 
     # SMTP Configuration
     smtp_server = Column(String(255), nullable=True)
@@ -63,8 +64,8 @@ def init_db():
     # Create default settings only if no settings exist (with race condition protection)
     try:
         if not Settings.query.first():
-            logger.info("Settings DB: Creating default configuration (Live Mode)")
-            default_settings = Settings(analyze_mode=False)
+            logger.info("Settings DB: Creating default configuration (Live Mode, Live Data)")
+            default_settings = Settings(analyze_mode=False, use_historical_data=False)
             db_session.add(default_settings)
             db_session.commit()
     except Exception as e:
@@ -75,7 +76,7 @@ def get_analyze_mode():
     """Get current analyze mode setting"""
     settings = Settings.query.first()
     if not settings:
-        settings = Settings(analyze_mode=False)  # Default to Live Mode
+        settings = Settings(analyze_mode=False, use_historical_data=False)  # Default to Live Mode
         db_session.add(settings)
         db_session.commit()
     return settings.analyze_mode
@@ -84,11 +85,31 @@ def set_analyze_mode(mode: bool):
     """Set analyze mode setting"""
     settings = Settings.query.first()
     if not settings:
-        settings = Settings(analyze_mode=mode)
+        settings = Settings(analyze_mode=mode, use_historical_data=False)
         db_session.add(settings)
     else:
         settings.analyze_mode = mode
     db_session.commit()
+
+def get_use_historical_data():
+    """Get current data mode setting (False = live data, True = historical data)"""
+    settings = Settings.query.first()
+    if not settings:
+        settings = Settings(analyze_mode=False, use_historical_data=False)  # Default to Live Data
+        db_session.add(settings)
+        db_session.commit()
+    return settings.use_historical_data if settings.use_historical_data is not None else False
+
+def set_use_historical_data(use_historical: bool):
+    """Set data mode setting (False = live data, True = historical data)"""
+    settings = Settings.query.first()
+    if not settings:
+        settings = Settings(analyze_mode=False, use_historical_data=use_historical)
+        db_session.add(settings)
+    else:
+        settings.use_historical_data = use_historical
+    db_session.commit()
+    logger.info(f"Data mode set to: {'Historical' if use_historical else 'Live'}")
 
 def _get_encryption_key():
     """Get or create encryption key for SMTP password"""
@@ -137,7 +158,7 @@ def set_smtp_settings(smtp_server=None, smtp_port=None, smtp_username=None,
     """Set SMTP configuration"""
     settings = Settings.query.first()
     if not settings:
-        settings = Settings(analyze_mode=False)
+        settings = Settings(analyze_mode=False, use_historical_data=False)
         db_session.add(settings)
     
     if smtp_server is not None:
@@ -165,6 +186,7 @@ def get_security_settings():
         # Create with defaults
         settings = Settings(
             analyze_mode=False,
+            use_historical_data=False,
             security_404_threshold=20,
             security_404_ban_duration=24,
             security_api_threshold=10,
@@ -188,7 +210,7 @@ def set_security_settings(threshold_404=None, ban_duration_404=None,
     """Set security configuration"""
     settings = Settings.query.first()
     if not settings:
-        settings = Settings(analyze_mode=False)
+        settings = Settings(analyze_mode=False, use_historical_data=False)
         db_session.add(settings)
 
     if threshold_404 is not None:

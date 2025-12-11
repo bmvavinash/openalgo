@@ -1,0 +1,375 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style>
+    .stat-card {
+        @apply bg-base-100 rounded-lg shadow-lg p-6 transition-all duration-300;
+    }
+    
+    .stat-card:hover {
+        @apply shadow-xl transform -translate-y-1;
+    }
+
+    .table-container {
+        @apply overflow-x-auto bg-base-100 rounded-lg shadow-lg mt-8;
+    }
+
+    .table-header {
+        @apply sticky top-0 bg-base-200 z-10;
+    }
+
+    .position-long {
+        @apply text-success font-semibold;
+    }
+
+    .position-short {
+        @apply text-error font-semibold;
+    }
+
+    .position-neutral {
+        @apply text-base-content font-semibold;
+    }
+
+    .price-up {
+        @apply text-success;
+        animation: pulse-green 1s ease-in-out;
+    }
+
+    .price-down {
+        @apply text-error;
+        animation: pulse-red 1s ease-in-out;
+    }
+
+    @keyframes pulse-green {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; background-color: rgba(34, 197, 94, 0.2); }
+    }
+
+    @keyframes pulse-red {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; background-color: rgba(239, 68, 68, 0.2); }
+    }
+
+    .auto-refresh-indicator {
+        @apply badge badge-sm badge-info;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <!-- Header Section -->
+    <div class="mb-6 flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold">Market Watch</h1>
+            <p class="text-base-content/60">Live position tracking with real-time P&L updates</p>
+        </div>
+        <div class="flex gap-2 items-center">
+            <div class="auto-refresh-indicator" id="refresh-indicator">
+                <span id="refresh-status">Auto-refresh: ON</span>
+            </div>
+            <button onclick="toggleAutoRefresh()" class="btn btn-primary" id="refresh-toggle-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                </svg>
+                <span id="refresh-btn-text">Pause Auto-Refresh</span>
+            </button>
+            <button onclick="manualRefresh()" class="btn btn-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                </svg>
+                Refresh Now
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="stat-card">
+            <div class="stat">
+                <div class="stat-title">Total Positions</div>
+                <div class="stat-value" id="total-positions">{{ positions_data|length }}</div>
+                <div class="stat-desc">Active positions</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat">
+                <div class="stat-title">Total P&L</div>
+                <div class="stat-value" id="total-pnl">
+                    {% set total_pnl = positions_data|sum(attribute='pnl')|default(0) %}
+                    <span class="{% if total_pnl > 0 %}text-success{% elif total_pnl < 0 %}text-error{% endif %}">
+                        ₹{{ "%.2f"|format(total_pnl) }}
+                    </span>
+                </div>
+                <div class="stat-desc">Unrealized P&L</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat">
+                <div class="stat-title">Total Investment</div>
+                <div class="stat-value" id="total-investment">
+                    {% set total_inv = positions_data|sum(attribute='average_price')|default(0) %}
+                    ₹{{ "%.2f"|format(total_inv) }}
+                </div>
+                <div class="stat-desc">Average price × Quantity</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat">
+                <div class="stat-title">Last Update</div>
+                <div class="stat-value text-sm" id="last-update">Just now</div>
+                <div class="stat-desc">Auto-refresh: <span id="refresh-interval">5s</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Positions Table -->
+    <div id="marketwatch-table-container" class="table-container">
+        <table class="table w-full table-zebra">
+            <thead class="table-header">
+                <tr>
+                    <th>Symbol</th>
+                    <th>Exchange</th>
+                    <th>Product</th>
+                    <th>Qty</th>
+                    <th>Avg Price</th>
+                    <th>LTP</th>
+                    <th>Change</th>
+                    <th>P&L</th>
+                    <th>P&L %</th>
+                </tr>
+            </thead>
+            <tbody id="positions-tbody">
+                {% for position in positions_data %}
+                <tr class="hover:bg-base-200 position-row" data-symbol="{{ position.symbol }}" data-exchange="{{ position.exchange }}">
+                    <td class="font-medium font-bold">{{ position.symbol }}</td>
+                    <td>
+                        {% set exchange_colors = {
+                            'NSE': 'badge-accent',
+                            'BSE': 'badge-neutral',
+                            'NFO': 'badge-secondary',
+                            'MCX': 'badge-primary'
+                        } %}
+                        <div class="badge {{ exchange_colors.get(position.exchange, 'badge-ghost') }}">
+                            {{ position.exchange }}
+                        </div>
+                    </td>
+                    <td>
+                        {% set product_type_colors = {
+                            'CNC': 'badge-secondary',
+                            'MIS': 'badge-accent',
+                            'NRML': 'badge-neutral'
+                        } %}
+                        <div class="badge {{ product_type_colors.get(position.product, 'badge-ghost') }}">
+                            {{ position.product }}
+                        </div>
+                    </td>
+                    <td class="{% if position.quantity|int > 0 %}position-long{% elif position.quantity|int < 0 %}position-short{% else %}position-neutral{% endif %} font-bold">
+                        {{ position.quantity }}
+                    </td>
+                    <td class="font-mono">{{ "%.2f"|format(position.average_price|default(0)) }}</td>
+                    <td class="font-mono font-bold ltp-cell" data-ltp="{{ position.ltp|default(0) }}">
+                        {{ "%.2f"|format(position.ltp|default(0)) if position.ltp else 'N/A' }}
+                    </td>
+                    <td class="font-mono change-cell" data-change="0">
+                        <span class="text-base-content">-</span>
+                    </td>
+                    <td class="font-mono font-bold pnl-cell {% if position.pnl|default(0)|float > 0 %}position-long{% elif position.pnl|default(0)|float < 0 %}position-short{% else %}position-neutral{% endif %}" data-pnl="{{ position.pnl|default(0) }}">
+                        ₹{{ "%.2f"|format(position.pnl|default(0)) }}
+                    </td>
+                    <td class="font-mono pnl-percent-cell {% if position.pnl|default(0)|float > 0 %}position-long{% elif position.pnl|default(0)|float < 0 %}position-short{% else %}position-neutral{% endif %}" data-pnl-percent="{{ position.pnl_percent|default(0) }}">
+                        {{ "%.2f"|format(position.pnl_percent|default(0)) }}%
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let autoRefreshEnabled = true;
+let refreshInterval = null;
+const REFRESH_INTERVAL_MS = 5000; // 5 seconds
+
+// Initialize auto-refresh
+document.addEventListener('DOMContentLoaded', function() {
+    startAutoRefresh();
+});
+
+function startAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+    
+    if (autoRefreshEnabled) {
+        refreshInterval = setInterval(() => {
+            refreshPositions();
+        }, REFRESH_INTERVAL_MS);
+        
+        updateRefreshIndicator(true);
+    }
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+    updateRefreshIndicator(false);
+}
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    
+    if (autoRefreshEnabled) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+}
+
+function updateRefreshIndicator(enabled) {
+    const indicator = document.getElementById('refresh-status');
+    const btnText = document.getElementById('refresh-btn-text');
+    
+    if (enabled) {
+        indicator.textContent = 'Auto-refresh: ON';
+        indicator.classList.remove('badge-error');
+        indicator.classList.add('badge-info');
+        btnText.textContent = 'Pause Auto-Refresh';
+    } else {
+        indicator.textContent = 'Auto-refresh: OFF';
+        indicator.classList.remove('badge-info');
+        indicator.classList.add('badge-error');
+        btnText.textContent = 'Resume Auto-Refresh';
+    }
+}
+
+function manualRefresh() {
+    refreshPositions();
+    showToast('Refreshing positions...', 'info');
+}
+
+function refreshPositions() {
+    // Fetch latest positions data using the same route
+    fetch(window.location.href, {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html'
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.text();
+        }
+        throw new Error('Failed to refresh');
+    })
+    .then(html => {
+        // Parse the HTML response
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Extract positions data from the new HTML
+        const newRows = doc.querySelectorAll('#positions-tbody tr');
+        const currentRows = document.querySelectorAll('#positions-tbody tr');
+        
+        // Update each row
+        newRows.forEach((newRow, index) => {
+            if (index < currentRows.length) {
+                const currentRow = currentRows[index];
+                const newLtp = parseFloat(newRow.querySelector('.ltp-cell').getAttribute('data-ltp'));
+                const newPnl = parseFloat(newRow.querySelector('.pnl-cell').getAttribute('data-pnl'));
+                const newPnlPercent = parseFloat(newRow.querySelector('.pnl-percent-cell').getAttribute('data-pnl-percent'));
+                
+                const currentLtp = parseFloat(currentRow.querySelector('.ltp-cell').getAttribute('data-ltp'));
+                const currentPnl = parseFloat(currentRow.querySelector('.pnl-cell').getAttribute('data-pnl'));
+                
+                // Update LTP with animation
+                if (newLtp !== currentLtp) {
+                    const ltpCell = currentRow.querySelector('.ltp-cell');
+                    const changeCell = currentRow.querySelector('.change-cell');
+                    
+                    const change = newLtp - currentLtp;
+                    const changePercent = currentLtp > 0 ? (change / currentLtp * 100) : 0;
+                    
+                    ltpCell.setAttribute('data-ltp', newLtp);
+                    ltpCell.textContent = newLtp.toFixed(2);
+                    
+                    if (change !== 0) {
+                        ltpCell.classList.add(change > 0 ? 'price-up' : 'price-down');
+                        setTimeout(() => {
+                            ltpCell.classList.remove('price-up', 'price-down');
+                        }, 1000);
+                    }
+                    
+                    // Update change
+                    changeCell.setAttribute('data-change', change);
+                    if (change > 0) {
+                        changeCell.innerHTML = `<span class="text-success">+${change.toFixed(2)} (+${changePercent.toFixed(2)}%)</span>`;
+                    } else if (change < 0) {
+                        changeCell.innerHTML = `<span class="text-error">${change.toFixed(2)} (${changePercent.toFixed(2)}%)</span>`;
+                    } else {
+                        changeCell.innerHTML = '<span class="text-base-content">-</span>';
+                    }
+                }
+                
+                // Update P&L
+                if (newPnl !== currentPnl) {
+                    const pnlCell = currentRow.querySelector('.pnl-cell');
+                    const pnlPercentCell = currentRow.querySelector('.pnl-percent-cell');
+                    
+                    pnlCell.setAttribute('data-pnl', newPnl);
+                    pnlCell.textContent = `₹${newPnl.toFixed(2)}`;
+                    
+                    pnlPercentCell.setAttribute('data-pnl-percent', newPnlPercent);
+                    pnlPercentCell.textContent = `${newPnlPercent.toFixed(2)}%`;
+                    
+                    // Update color classes
+                    pnlCell.className = 'font-mono font-bold pnl-cell';
+                    pnlPercentCell.className = 'font-mono pnl-percent-cell';
+                    
+                    if (newPnl > 0) {
+                        pnlCell.classList.add('position-long');
+                        pnlPercentCell.classList.add('position-long');
+                    } else if (newPnl < 0) {
+                        pnlCell.classList.add('position-short');
+                        pnlPercentCell.classList.add('position-short');
+                    } else {
+                        pnlCell.classList.add('position-neutral');
+                        pnlPercentCell.classList.add('position-neutral');
+                    }
+                }
+            }
+        });
+        
+        // Update summary stats
+        const newTotalPnl = Array.from(newRows).reduce((sum, row) => {
+            return sum + parseFloat(row.querySelector('.pnl-cell').getAttribute('data-pnl'));
+        }, 0);
+        
+        const totalPnlElement = document.getElementById('total-pnl');
+        totalPnlElement.innerHTML = `<span class="${newTotalPnl > 0 ? 'text-success' : newTotalPnl < 0 ? 'text-error' : ''}">₹${newTotalPnl.toFixed(2)}</span>`;
+        
+        // Update last update time
+        const now = new Date();
+        document.getElementById('last-update').textContent = now.toLocaleTimeString();
+    })
+    .catch(error => {
+        console.error('Error refreshing positions:', error);
+    });
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+</script>
+{% endblock %}
+

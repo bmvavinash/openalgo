@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, url_for, render_template, session, jsonify, make_response, flash
+from flask import Blueprint, request, redirect, url_for, render_template, session, jsonify, make_response, flash, current_app
 from limiter import limiter  # Import the limiter instance
 from extensions import socketio
 import os
@@ -33,11 +33,18 @@ def login():
     if find_user_by_username() is None:
         return redirect(url_for('core_bp.setup'))
 
-    if 'user' in session:
-            return redirect(url_for('auth.broker_login'))
-    
+    # Check if already logged in - redirect to analyzer for paper trading
     if session.get('logged_in'):
-        return redirect(url_for('dashboard_bp.dashboard'))
+        # Verify session is still valid
+        from utils.session import is_session_valid
+        if is_session_valid():
+            return redirect(url_for('analyzer_bp.analyzer'))
+        else:
+            # Session expired, clear it
+            session.clear()
+    
+    if 'user' in session and not session.get('logged_in'):
+        return redirect(url_for('auth.broker_login'))
 
     if request.method == 'GET':
         return render_template('login.html')
@@ -46,10 +53,78 @@ def login():
         password = request.form['password']
         
         if authenticate_user(username, password):
-            session['user'] = username  # Set the username in the session
-            logger.info(f"Login success for user: {username}")
-            # Redirect to broker login without marking as fully logged in
-            return jsonify({'status': 'success'}), 200
+            # Set session as permanent FIRST before setting values
+            from utils.session import set_session_login_time, get_session_expiry_time
+            from flask import make_response
+            
+            # Set permanent session lifetime BEFORE setting session values
+            session.permanent = True
+            expiry_timedelta = get_session_expiry_time()
+            current_app.permanent_session_lifetime = expiry_timedelta
+            
+            # Now set session values
+            session['user'] = username
+            session['logged_in'] = True
+            session['paper_trading_mode'] = True
+            set_session_login_time()  # Set login time for session expiry
+            
+            # CRITICAL: Force Flask to save session by accessing it and marking as modified
+            # Flask only saves session if session.modified is True AND session is accessed
+            _ = session.get('user')  # Access session to ensure it's tracked
+            session.modified = True
+            
+            # Log session state for debugging
+            logger.info(f"Login success for user: {username}, session keys: {list(session.keys())}, permanent: {session.permanent}, modified: {session.modified}, login_time: {session.get('login_time')}")
+            
+            # Verify session values are set
+            if not session.get('logged_in') or not session.get('login_time'):
+                logger.error(f"CRITICAL: Session values not set properly! logged_in: {session.get('logged_in')}, login_time: {session.get('login_time')}")
+            
+            # CRITICAL: Ensure session is fully set and modified before creating response
+            # Access all session keys to ensure Flask tracks them
+            _ = session.get('user')
+            _ = session.get('logged_in')
+            _ = session.get('paper_trading_mode')
+            _ = session.get('login_time')
+            session.modified = True
+            
+            # Create response and ensure session cookie is set
+            # Flask saves session cookie automatically when response is returned
+            response = make_response(jsonify({'status': 'success'}), 200)
+            
+            # CRITICAL: Ensure session is saved by accessing session interface
+            # This forces Flask to write the session cookie
+            try:
+                from flask import has_request_context
+                if has_request_context():
+                    # Force session save by accessing session interface
+                    # This MUST be called before returning the response
+                    current_app.session_interface.save_session(current_app, session, response)
+                    logger.info(f"Session saved explicitly via session_interface. Response headers: {list(response.headers.keys())}")
+                    
+                    # Verify cookie is in response
+                    set_cookie_headers = response.headers.getlist('Set-Cookie')
+                    if set_cookie_headers:
+                        logger.info(f"Session cookie set in response: {len(set_cookie_headers)} cookie(s)")
+                        for cookie in set_cookie_headers:
+                            if 'session' in cookie.lower():
+                                logger.info(f"Found session cookie: {cookie[:100]}")
+                    else:
+                        logger.warning("WARNING: No Set-Cookie headers in response!")
+                        
+                    # Double-check session is still in response after save
+                    if not session.modified:
+                        logger.warning("WARNING: Session modified flag is False after save!")
+            except Exception as e:
+                logger.error(f"CRITICAL ERROR: Could not save session: {e}", exc_info=True)
+            
+            # Final verification - ensure session values are still set
+            if not session.get('logged_in'):
+                logger.error("CRITICAL: logged_in is False in session after all operations!")
+            if not session.get('login_time'):
+                logger.error("CRITICAL: login_time is missing in session after all operations!")
+            
+            return response
         else:
             return jsonify({'status': 'error', 'message': 'Invalid credentials'}), 401
 
@@ -79,6 +154,26 @@ def broker_login():
                              broker_api_secret_masked=mask_api_credential(BROKER_API_SECRET),
                              redirect_url=REDIRECT_URL,
                              broker_name=broker_name)
+
+@auth_bp.route('/skip-broker', methods=['GET'])
+@limiter.limit(LOGIN_RATE_LIMIT_MIN)
+@limiter.limit(LOGIN_RATE_LIMIT_HOUR)
+def skip_broker():
+    """Skip broker selection and go directly to analyzer for paper trading"""
+    if 'user' not in session:
+        return redirect(url_for('auth.login'))
+    
+    # Set session flags for paper trading access
+    # We need 'logged_in' for session validity check, but we'll use analyzer mode
+    from utils.session import set_session_login_time, get_session_expiry_time
+    session['logged_in'] = True
+    session['paper_trading_mode'] = True
+    session.permanent = True
+    current_app.permanent_session_lifetime = get_session_expiry_time()
+    set_session_login_time()
+    
+    logger.info(f"User {session.get('user')} skipping broker selection, redirecting to analyzer for paper trading")
+    return redirect(url_for('analyzer_bp.analyzer'))
 
 @auth_bp.route('/reset-password', methods=['GET', 'POST'])
 @limiter.limit(RESET_RATE_LIMIT)  # Password reset rate limit

@@ -2,6 +2,7 @@ import importlib
 import traceback
 from typing import Tuple, Dict, Any, Optional, Union
 from database.auth_db import get_auth_token_broker
+from database.settings_db import get_analyze_mode
 from utils.logging import get_logger
 
 # Initialize logger
@@ -97,6 +98,16 @@ def get_funds(api_key: Optional[str] = None, auth_token: Optional[str] = None, b
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # In analyze/paper mode, bypass broker and use sandbox funds
+        try:
+            if get_analyze_mode():
+                from services.sandbox_service import sandbox_get_funds
+                original_data = {'apikey': api_key}
+                return sandbox_get_funds(api_key, original_data)
+        except Exception:
+            # If any error in detect, fall through to broker path
+            pass
+
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
             return False, {

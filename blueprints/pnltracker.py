@@ -89,26 +89,14 @@ def test_chart():
 def get_pnl_data():
     """Get intraday PnL data."""
     try:
-        broker = session.get('broker')
-        if not broker:
-            logger.error("Broker not set in session")
-            return jsonify({
-                'status': 'error',
-                'message': 'Broker not set in session'
-            }), 400
-
-        # Get auth token from session - same as orders.py
         login_username = session['user']
-        auth_token = get_auth_token(login_username)
         
-        if auth_token is None:
-            logger.warning(f"No auth token found for user {login_username}")
-            return jsonify({
-                'status': 'error',
-                'message': 'Authentication required'
-            }), 401
+        # Check if in analyze mode or paper trading mode
+        from database.settings_db import get_analyze_mode
+        analyze_mode = get_analyze_mode()
+        paper_trading = session.get('paper_trading_mode', False)
 
-        # Get API key for the user (for services)
+        # Get API key for the user (for services) - required for both modes
         api_key = get_api_key_for_tradingview(login_username)
         if not api_key:
             logger.warning(f"No API key found for user {login_username}")
@@ -116,6 +104,23 @@ def get_pnl_data():
                 'status': 'error',
                 'message': 'API key not configured. Please generate an API key in /apikey'
             }), 401
+        
+        # In live broker mode, verify auth token and broker are available
+        if not (analyze_mode or paper_trading):
+            auth_token = get_auth_token(login_username)
+            if auth_token is None:
+                logger.warning(f"No auth token found for user {login_username}")
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Authentication required'
+                }), 401
+            broker = session.get('broker')
+            if not broker:
+                logger.error("Broker not set in session")
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Broker not set in session'
+                }), 400
 
         # Default to today's date for historical data (will be overridden by trade date if trades exist)
         ist = pytz.timezone('Asia/Kolkata')

@@ -142,8 +142,18 @@ def get_positionbook(
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # Check if in analyze/paper trading mode - use sandbox directly
+        from database.settings_db import get_analyze_mode
+        if get_analyze_mode():
+            logger.info(f"Paper trading mode detected - routing to sandbox for API key: {api_key[:10]}...{api_key[-4:]}")
+            from services.sandbox_service import sandbox_get_positions
+            original_data = {'apikey': api_key}
+            return sandbox_get_positions(api_key, original_data)
+        
+        # Live broker mode - get auth token
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
+            logger.warning(f"Failed to get auth token for API key: {api_key[:10]}...{api_key[-4:]}")
             return False, {
                 'status': 'error',
                 'message': 'Invalid openalgo apikey'

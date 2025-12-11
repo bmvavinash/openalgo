@@ -170,7 +170,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Reconstruct the JSON object in the correct order
+            // Note: Data mode (live vs historical) is controlled by the global toggle in navbar
             let orderedData;
+
             if (currentMode === 'line') {
                 orderedData = {
                     "apikey": data.apikey,

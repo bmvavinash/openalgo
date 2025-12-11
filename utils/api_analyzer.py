@@ -4,6 +4,7 @@ from database.analyzer_db import AnalyzerLog, db_session
 from database.symbol import SymToken
 from sqlalchemy import func
 import json
+import traceback
 from extensions import socketio
 from utils.constants import (
     VALID_EXCHANGES,
@@ -547,8 +548,25 @@ def get_analyzer_stats():
         # Process requests
         for req in recent_requests:
             try:
-                request_data = json.loads(req.request_data)
-                response_data = json.loads(req.response_data)
+                # Handle request_data - could be string or dict
+                if isinstance(req.request_data, str):
+                    try:
+                        request_data = json.loads(req.request_data)
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning(f"Invalid JSON in request_data for log {req.id}: {req.request_data[:100]}")
+                        continue
+                else:
+                    request_data = req.request_data if isinstance(req.request_data, dict) else {}
+                
+                # Handle response_data - could be string or dict
+                if isinstance(req.response_data, str):
+                    try:
+                        response_data = json.loads(req.response_data)
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning(f"Invalid JSON in response_data for log {req.id}: {req.response_data[:100]}")
+                        response_data = {}
+                else:
+                    response_data = req.response_data if isinstance(req.response_data, dict) else {}
                 
                 # Update sources
                 source = request_data.get('strategy', 'Unknown')
@@ -575,7 +593,7 @@ def get_analyzer_stats():
                         stats['issues']['by_type']['other'] += 1
 
             except Exception as e:
-                logger.error(f"Error processing request: {str(e)}")
+                logger.error(f"Error processing request {req.id}: {str(e)}\n{traceback.format_exc()}")
                 continue
 
         # Convert set to list for JSON serialization

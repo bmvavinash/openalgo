@@ -18,7 +18,11 @@
         try {
             const response = await fetch('/auth/login', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                credentials: 'include',  // CRITICAL: Include cookies in request
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             });
             const data = await response.json();
 
@@ -30,7 +34,8 @@
                 loginStatus.classList.remove('alert-info');
                 loginStatus.classList.add('alert-success');
                 loginStatus.querySelector('span').textContent = 'Login successful';
-                window.location.href = '/auth/broker';
+                // Redirect to analyzer for paper trading (skip broker selection)
+                window.location.href = '/analyzer';
             }
         } catch (error) {
             loginStatus.classList.remove('alert-info');

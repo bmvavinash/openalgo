@@ -2,6 +2,7 @@ import importlib
 import traceback
 from typing import Tuple, Dict, Any, Optional, Union
 from database.auth_db import get_auth_token_broker
+from database.settings_db import get_analyze_mode
 from utils.logging import get_logger
 
 # Initialize logger
@@ -118,6 +119,15 @@ def get_quotes(
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # If in analyze/paper mode, bypass broker and fetch via sandbox/yfinance
+        try:
+            if get_analyze_mode():
+                success, data, status = _get_sandbox_quote(symbol, exchange)
+                return success, data, status
+        except Exception:
+            # Fallback silently to broker path if any error in analyze mode detection
+            pass
+
         AUTH_TOKEN, FEED_TOKEN, broker_name = get_auth_token_broker(api_key, include_feed_token=True)
         if AUTH_TOKEN is None:
             return False, {
@@ -136,6 +146,58 @@ def get_quotes(
             'status': 'error',
             'message': 'Either api_key or both auth_token and broker must be provided'
         }, 400
+
+
+def _get_sandbox_quote(symbol: str, exchange: str) -> Tuple[bool, Dict[str, Any], int]:
+    """
+    Fetch quotes in analyze/paper mode without requiring a broker token.
+    Uses yfinance-backed NSE data fetcher as a lightweight source.
+    """
+    try:
+        from utils.nse_data_fetcher import get_nse_data
+        import pandas as pd
+
+        # Fetch recent intraday data (1m if available, else 5m)
+        df = get_nse_data(symbol, interval='1m', period='1d')
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            df = get_nse_data(symbol, interval='5m', period='5d')
+
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return False, {
+                'status': 'error',
+                'message': f'No market data for {symbol}'
+            }, 404
+
+        last_row = df.iloc[-1]
+        ltp = float(last_row['close'])
+        ohlc = {
+            'open': float(last_row['open']),
+            'high': float(last_row['high']),
+            'low': float(last_row['low']),
+            'close': float(last_row['close']),
+            'prev_close': float(df.iloc[-2]['close']) if len(df) > 1 else float(last_row['close']),
+            'volume': float(last_row['volume']) if 'volume' in last_row else 0.0
+        }
+
+        quote = {
+            'symbol': symbol,
+            'exchange': exchange,
+            'ltp': ltp,
+            'bid': 0,
+            'ask': 0,
+            **ohlc
+        }
+
+        return True, {
+            'status': 'success',
+            'data': quote
+        }, 200
+    except Exception as e:
+        logger.error(f"Sandbox quote fetch failed for {symbol}: {e}")
+        return False, {
+            'status': 'error',
+            'message': f'Failed to fetch sandbox quote: {str(e)}'
+        }, 500
 
 def get_multiquotes_with_auth(auth_token: str, feed_token: Optional[str], broker: str, symbols: list) -> Tuple[bool, Dict[str, Any], int]:
     """
