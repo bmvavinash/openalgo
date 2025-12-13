@@ -42,7 +42,6 @@ from blueprints.telegram import telegram_bp  # Import the telegram blueprint
 from blueprints.security import security_bp  # Import the security blueprint
 from blueprints.sandbox import sandbox_bp  # Import the sandbox blueprint
 from blueprints.playground import playground_bp  # Import the API playground blueprint
-from blueprints.marketwatch import marketwatch_bp  # Import the Market Watch blueprint
 from services.telegram_bot_service import telegram_bot_service
 from database.telegram_db import get_bot_config
 
@@ -212,7 +211,6 @@ def create_app():
     app.register_blueprint(security_bp)  # Register Security blueprint
     app.register_blueprint(sandbox_bp)  # Register Sandbox blueprint
     app.register_blueprint(playground_bp)  # Register API playground blueprint
-    app.register_blueprint(marketwatch_bp)  # Register Market Watch blueprint
 
 
     # Exempt webhook endpoints from CSRF protection after app initialization

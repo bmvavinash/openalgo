@@ -1,125 +1,91 @@
 """
-NSE Data Fetcher
-Fetches historical market data for NSE symbols using yfinance
+NSE Data Fetcher Utility
+Fetches historical market data for NSE indices and stocks
 """
 
 import pandas as pd
-import yfinance as yf
-from datetime import datetime, timedelta
+import logging
 from typing import Optional
-from utils.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-# Mapping for NSE symbols to yfinance tickers
-SYMBOL_MAPPING = {
-    'NIFTY': '^NSEI',  # Nifty 50
-    'BANKNIFTY': '^NSEBANK',  # Bank Nifty
-    'FINNIFTY': '^NSFINITY',  # Fin Nifty
-    'MIDCPNIFTY': '^NSEMIDCP',  # Midcap Nifty
-}
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    logger.warning("yfinance not available. Install with: pip install yfinance")
 
-def get_nse_data(symbol: str, exchange: str = 'NSE', interval: str = '5m', period: str = '1W', **kwargs) -> pd.DataFrame:
+
+def get_nse_data(symbol: str, exchange: str = 'NSE', interval: str = '5m', 
+                 period: str = '1d', source: str = 'yfinance') -> pd.DataFrame:
     """
-    Fetch NSE market data using yfinance
+    Fetch historical market data for NSE symbols
     
     Args:
-        symbol: Trading symbol (e.g., 'NIFTY', 'BANKNIFTY', or stock symbol)
+        symbol: Symbol name (e.g., 'NIFTY', 'BANKNIFTY')
         exchange: Exchange name (default: 'NSE')
-        interval: Data interval ('1m', '5m', '15m', '1h', '1d')
-        period: Time period ('1d', '5d', '1W', '1M', '3M', '6M', '1Y')
+        interval: Data interval ('1m', '5m', '15m', '1h', '1d', etc.)
+        period: Time period ('1d', '5d', '1mo', '3mo', '1y', etc.)
+        source: Data source ('yfinance' or 'nse')
     
     Returns:
-        pd.DataFrame: Historical data with columns: timestamp, open, high, low, close, volume
+        pd.DataFrame: DataFrame with columns: timestamp, open, high, low, close, volume
     """
+    if not YFINANCE_AVAILABLE:
+        logger.error("yfinance not available. Cannot fetch data.")
+        return pd.DataFrame()
+    
     try:
-        # Accept and ignore extra kwargs (e.g., source) to stay backward compatible
-        _ = kwargs
-
-        # Map symbol to yfinance ticker
-        ticker = SYMBOL_MAPPING.get(symbol.upper(), symbol)
+        # Map NSE indices to yfinance symbols
+        symbol_map = {
+            'NIFTY': '^NSEI',
+            'BANKNIFTY': '^NSEBANK',
+            'FINNIFTY': '^NSEFIN',
+            'MIDCPNIFTY': '^NSEMIDCP'
+        }
         
-        # For Indian stocks, add .NS suffix if not already present and not an index
-        if ticker not in SYMBOL_MAPPING.values() and not ticker.startswith('^'):
-            if not ticker.endswith('.NS'):
-                ticker = f"{ticker}.NS"
+        yf_symbol = symbol_map.get(symbol.upper(), f"{symbol}.NS")
         
-        logger.info(f"Fetching {symbol} data from yfinance (intraday {interval} - using period={period}), interval: {interval}")
+        logger.debug(f"Fetching {interval} data for {symbol} ({yf_symbol}) for period {period}")
         
-        # For intraday intervals, yfinance has limitations
-        # Max 60 days for 1m, 5m, 15m, 1h intervals
-        if interval in ['1m', '5m', '15m', '1h']:
-            # Convert period to days for intraday
-            period_days_map = {
-                '1d': 1,
-                '5d': 5,
-                '1W': 7,
-                '1M': 30,
-                '3M': 90,
-                '6M': 180,
-                '1Y': 365
-            }
-            days = period_days_map.get(period, 7)
-            # Limit to 59 days for intraday (yfinance limitation)
-            if days > 59:
-                days = 59
-                logger.info(f"Using period=59d for intraday data (yfinance limitation: max 60 days for intraday intervals)")
-            
-            # Use period parameter for intraday
-            ticker_obj = yf.Ticker(ticker)
-            df = ticker_obj.history(period=f"{days}d", interval=interval)
-        else:
-            # For daily intervals, use period directly
-            ticker_obj = yf.Ticker(ticker)
-            df = ticker_obj.history(period=period, interval=interval)
+        ticker = yf.Ticker(yf_symbol)
+        df = ticker.history(period=period, interval=interval)
         
-        # Ensure df is a DataFrame (handle dict or other types)
-        if not isinstance(df, pd.DataFrame):
-            logger.warning(f"History call for {symbol} returned {type(df).__name__} instead of DataFrame; converting to empty DataFrame")
-            if isinstance(df, dict):
-                logger.warning(f"  Dict keys: {list(df.keys()) if df else 'empty'}")
-            return pd.DataFrame()
-
         if df.empty:
-            logger.warning(f"No data returned for {symbol} (ticker: {ticker})")
+            logger.warning(f"No data available for {symbol} ({yf_symbol})")
             return pd.DataFrame()
         
-        # Rename columns to standard format
-        df = df.rename(columns={
-            'Open': 'open',
-            'High': 'high',
-            'Low': 'low',
-            'Close': 'close',
-            'Volume': 'volume'
-        })
-        
-        # Reset index to get timestamp as column
-        df = df.reset_index()
-        if 'Date' in df.columns:
-            df = df.rename(columns={'Date': 'timestamp'})
-        elif 'Datetime' in df.columns:
-            df = df.rename(columns={'Datetime': 'timestamp'})
+        # Normalize column names to lowercase
+        df.columns = [col.lower() for col in df.columns]
+        df.reset_index(inplace=True)
         
         # Ensure timestamp column exists
-        if 'timestamp' not in df.columns and df.index.name:
-            df = df.reset_index()
-            if df.index.name:
-                df = df.rename(columns={df.index.name: 'timestamp'})
+        if 'date' in df.columns:
+            df.rename(columns={'date': 'timestamp'}, inplace=True)
+        elif 'datetime' in df.columns:
+            df.rename(columns={'datetime': 'timestamp'}, inplace=True)
+        elif df.index.name in ['Date', 'Datetime']:
+            df.reset_index(inplace=True)
+            if len(df.columns) > 0:
+                df.rename(columns={df.columns[0]: 'timestamp'}, inplace=True)
         
-        # Select only required columns
-        required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume']
-        available_columns = [col for col in required_columns if col in df.columns]
-        df = df[available_columns]
+        # Ensure required columns exist
+        required_cols = ['close']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            logger.warning(f"Missing required columns: {missing_cols}")
+            return pd.DataFrame()
         
         # Ensure timestamp is datetime
         if 'timestamp' in df.columns:
             df['timestamp'] = pd.to_datetime(df['timestamp'])
         
-        logger.info(f"Fetched {len(df)} records for {symbol}")
-        
+        logger.debug(f"Fetched {len(df)} records for {symbol}")
         return df
-        
+    
     except Exception as e:
         logger.error(f"Error fetching data for {symbol}: {e}", exc_info=True)
         return pd.DataFrame()
+
 

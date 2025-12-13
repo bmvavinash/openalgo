@@ -113,12 +113,7 @@ class OrderManager:
 
             # Validate MIS orders - reject if after square-off time but before market open
             # Exception: Allow orders that reduce/close existing positions
-            # Historical data mode: Skip square-off validation for testing (allows orders after square-off)
-            # Live data mode: Enforce square-off strictly (blocks orders after square-off)
-            from database.settings_db import get_use_historical_data
-            use_historical_data = get_use_historical_data()
-            
-            if product == 'MIS' and not use_historical_data:
+            if product == 'MIS':
                 from sandbox.squareoff_manager import SquareOffManager
                 from datetime import time
 
@@ -451,26 +446,9 @@ class OrderManager:
                         engine._process_order(order, quote)
                         logger.info(f"Market order {orderid} executed immediately")
                     else:
-                        # Fallback: Use the stored price (LTP from margin calculation) for execution
-                        logger.warning(f"Could not fetch quote for {symbol} on {exchange}, using stored LTP for execution")
-                        if order_price_to_store and order_price_to_store > 0:
-                            # Create a synthetic quote from stored price
-                            fallback_quote = {
-                                'ltp': float(order_price_to_store),
-                                'bid': float(order_price_to_store * Decimal('0.999')),  # Slightly lower for SELL
-                                'ask': float(order_price_to_store * Decimal('1.001')),  # Slightly higher for BUY
-                                'high': float(order_price_to_store),
-                                'low': float(order_price_to_store),
-                                'open': float(order_price_to_store),
-                                'close': float(order_price_to_store),
-                                'volume': 0
-                            }
-                            logger.info(f"Using fallback quote with LTP={order_price_to_store} for {symbol}")
-                            engine._process_order(order, fallback_quote)
-                        else:
-                            logger.error(f"No fallback price available for {symbol}, order remains open")
+                        logger.warning(f"Could not fetch quote for {symbol} on {exchange}, order remains open")
                 except Exception as e:
-                    logger.error(f"Error executing market order immediately: {e}", exc_info=True)
+                    logger.error(f"Error executing market order immediately: {e}")
                     # Order remains in 'open' status if execution fails
 
             return True, {
@@ -715,28 +693,13 @@ class OrderManager:
 
             orderbook = []
             for order in orders:
-                # For MARKET orders, prefer average_price (execution price) if available, otherwise use price (LTP)
-                display_price = 0.0
-                if order.price_type == 'MARKET':
-                    # For completed MARKET orders, show execution price
-                    if order.average_price and order.average_price > 0:
-                        display_price = float(order.average_price)
-                    # For pending MARKET orders, show the LTP stored in price field
-                    elif order.price and order.price > 0:
-                        display_price = float(order.price)
-                    else:
-                        display_price = 0.0
-                else:
-                    # For LIMIT/SL orders, show the limit/trigger price
-                    display_price = float(order.price) if order.price else 0.0
-                
                 orderbook.append({
                     'orderid': order.orderid,
                     'symbol': order.symbol,
                     'exchange': order.exchange,
                     'action': order.action,
                     'quantity': order.quantity,
-                    'price': display_price,
+                    'price': float(order.price) if order.price else 0.0,
                     'trigger_price': float(order.trigger_price) if order.trigger_price else 0.0,
                     'pricetype': order.price_type,  # Match broker API format
                     'product': order.product,
@@ -784,21 +747,6 @@ class OrderManager:
                     'mode': 'analyze'
                 }, 404
 
-            # For MARKET orders, prefer average_price (execution price) if available, otherwise use price (LTP)
-            display_price = 0.0
-            if order.price_type == 'MARKET':
-                # For completed MARKET orders, show execution price
-                if order.average_price and order.average_price > 0:
-                    display_price = float(order.average_price)
-                # For pending MARKET orders, show the LTP stored in price field
-                elif order.price and order.price > 0:
-                    display_price = float(order.price)
-                else:
-                    display_price = 0.0
-            else:
-                # For LIMIT/SL orders, show the limit/trigger price
-                display_price = float(order.price) if order.price else 0.0
-            
             return True, {
                 'status': 'success',
                 'data': {
@@ -807,7 +755,7 @@ class OrderManager:
                     'exchange': order.exchange,
                     'action': order.action,
                     'quantity': order.quantity,
-                    'price': display_price,
+                    'price': float(order.price) if order.price else 0.0,
                     'trigger_price': float(order.trigger_price) if order.trigger_price else 0.0,
                     'price_type': order.price_type,
                     'product': order.product,

@@ -40,12 +40,6 @@
                 </a>
             </li>
             <li>
-                <a href="{{ url_for('marketwatch_bp.marketwatch') }}"
-                   class="text-base hover:bg-base-200 {{ 'active' if request.endpoint == 'marketwatch_bp.marketwatch' }}">
-                    Market Watch
-                </a>
-            </li>
-            <li>
                 <a href="{{ url_for('orders_bp.action_center') }}"
                    class="text-base hover:bg-base-200 {{ 'active' if request.endpoint == 'orders_bp.action_center' }}">
                     Action Center
@@ -73,7 +67,7 @@
             <li>
                 <a href="{{ url_for('playground.index') }}"
                    class="text-base hover:bg-base-200 {{ 'active' if request.endpoint == 'playground.index' }}">
-                    Playground
+                    Market Watch
                 </a>
             </li>
         </ul>
@@ -146,76 +140,6 @@
                         }
                     });
                 }
-            })();
-        </script>
-
-        <!-- Data Mode Toggle (Live vs Historical) -->
-        <div class="data-mode-controller-container flex items-center gap-2">
-            <!-- Data Mode Badge -->
-            <div class="badge badge-lg" id="data-mode-badge" style="opacity: 0;"></div>
-
-            <!-- Data Mode Toggle -->
-            <div class="tooltip tooltip-bottom" data-tip="Toggle Live/Historical Data Mode">
-                <label class="swap swap-rotate btn btn-ghost btn-circle" style="opacity: 0;">
-                    <input type="checkbox" class="data-mode-controller" />
-                    <!-- historical icon (clock/chart) -->
-                    <svg class="swap-on fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
-                    </svg>
-                    <!-- live icon (signal/wave) -->
-                    <svg class="swap-off fill-current w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                        <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
-                    </svg>
-                </label>
-            </div>
-        </div>
-        <script>
-            // Initialize data mode badge and toggle
-            (function() {
-                fetch('/settings/data-mode')
-                    .then(response => response.json())
-                    .then(data => {
-                        const useHistorical = data.use_historical_data || false;
-                        const dataModeBadge = document.getElementById('data-mode-badge');
-                        const dataModeController = document.querySelector('.data-mode-controller');
-                        const dataModeToggleLabel = document.querySelector('.data-mode-controller-container .swap');
-
-                        // Set data mode controller checkbox state
-                        if (dataModeController) {
-                            dataModeController.checked = useHistorical;
-                        }
-
-                        // Show toggle with correct icon
-                        if (dataModeToggleLabel) {
-                            dataModeToggleLabel.style.opacity = '1';
-                        }
-
-                        // Set data mode badge
-                        if (dataModeBadge) {
-                            const isMobile = window.innerWidth < 640;
-                            if (useHistorical) {
-                                dataModeBadge.textContent = isMobile ? 'Historical' : 'Historical Data';
-                                dataModeBadge.classList.add('badge-info');
-                            } else {
-                                dataModeBadge.textContent = isMobile ? 'Live' : 'Live Data';
-                                dataModeBadge.classList.add('badge-success');
-                            }
-                            dataModeBadge.style.opacity = '1';
-
-                            // Update text on resize
-                            window.addEventListener('resize', function() {
-                                const isMobileNow = window.innerWidth < 640;
-                                if (useHistorical) {
-                                    dataModeBadge.textContent = isMobileNow ? 'Historical' : 'Historical Data';
-                                } else {
-                                    dataModeBadge.textContent = isMobileNow ? 'Live' : 'Live Data';
-                                }
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.error('[Data Mode] Error fetching data mode:', error);
-                    });
             })();
         </script>
 

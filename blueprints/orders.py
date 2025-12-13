@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, Response, flash
+from flask import Blueprint, jsonify, request, render_template, session, redirect, url_for, Response
 from importlib import import_module
 from database.auth_db import get_auth_token, get_api_key_for_tradingview
 from database.settings_db import get_analyze_mode
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 API_RATE_LIMIT = os.getenv("API_RATE_LIMIT", "50 per second")
 
 # Define the blueprint
-orders_bp = Blueprint('orders_bp', __name__, url_prefix='/orders')
+orders_bp = Blueprint('orders_bp', __name__, url_prefix='/')
 
 @orders_bp.errorhandler(429)
 def ratelimit_handler(e):
@@ -136,34 +136,29 @@ def orderbook():
     if analyze_mode or paper_trading:
         # Get API key for sandbox/paper trading mode
         api_key = get_api_key_for_tradingview(login_username)
-        logger.info(f"API key retrieval for user {login_username}: {'Found' if api_key else 'NOT FOUND'}, length: {len(api_key) if api_key else 0}")
         if api_key:
-            logger.debug(f"API key first 10 chars: {api_key[:10]}... (last 4: ...{api_key[-4:]})")
             success, response, status_code = get_orderbook(api_key=api_key)
         else:
-            logger.error(f"No API key found for user {login_username} in analyze/paper trading mode")
-            flash('API key required for paper trading mode. Please generate an API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
+            logger.error("No API key found for analyze/paper trading mode")
+            return "API key required for analyze/paper trading mode", 400
     else:
         # Live broker mode - check for auth token and broker
         auth_token = get_auth_token(login_username)
         if auth_token is None:
             logger.warning(f"No auth token found for user {login_username}")
             return redirect(url_for('auth.logout'))
+
         broker = session.get('broker')
         if not broker:
             logger.error("Broker not set in session")
             return "Broker not set in session", 400
+
         success, response, status_code = get_orderbook(auth_token=auth_token, broker=broker)
 
     if not success:
         logger.error(f"Failed to get orderbook data: {response.get('message', 'Unknown error')}")
         if status_code == 404:
             return "Failed to import broker module", 500
-        # Don't redirect to logout if it's an API key issue - show error instead
-        if 'Invalid openalgo apikey' in str(response.get('message', '')):
-            flash('Invalid API key. Please generate a new API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
         return redirect(url_for('auth.logout'))
 
     data = response.get('data', {})
@@ -177,42 +172,34 @@ def orderbook():
 @limiter.limit(API_RATE_LIMIT)
 def tradebook():
     login_username = session['user']
+    auth_token = get_auth_token(login_username)
 
-    # Check if in analyze mode or paper trading mode
-    analyze_mode = get_analyze_mode()
-    paper_trading = session.get('paper_trading_mode', False)
+    if auth_token is None:
+        logger.warning(f"No auth token found for user {login_username}")
+        return redirect(url_for('auth.logout'))
 
-    if analyze_mode or paper_trading:
-        # Get API key for sandbox/paper trading mode
+    broker = session.get('broker')
+    if not broker:
+        logger.error("Broker not set in session")
+        return "Broker not set in session", 400
+
+    # Check if in analyze mode and route accordingly
+    if get_analyze_mode():
+        # Get API key for sandbox mode
         api_key = get_api_key_for_tradingview(login_username)
-        logger.info(f"API key retrieval for user {login_username}: {'Found' if api_key else 'NOT FOUND'}, length: {len(api_key) if api_key else 0}")
         if api_key:
-            logger.debug(f"API key first 10 chars: {api_key[:10]}... (last 4: ...{api_key[-4:]})")
             success, response, status_code = get_tradebook(api_key=api_key)
         else:
-            logger.error(f"No API key found for user {login_username} in analyze/paper trading mode")
-            flash('API key required for paper trading mode. Please generate an API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
+            logger.error("No API key found for analyze mode")
+            return "API key required for analyze mode", 400
     else:
-        # Live broker mode - check for auth token and broker
-        auth_token = get_auth_token(login_username)
-        if auth_token is None:
-            logger.warning(f"No auth token found for user {login_username}")
-            return redirect(url_for('auth.logout'))
-        broker = session.get('broker')
-        if not broker:
-            logger.error("Broker not set in session")
-            return "Broker not set in session", 400
+        # Use live broker
         success, response, status_code = get_tradebook(auth_token=auth_token, broker=broker)
 
     if not success:
         logger.error(f"Failed to get tradebook data: {response.get('message', 'Unknown error')}")
         if status_code == 404:
             return "Failed to import broker module", 500
-        # Don't redirect to logout if it's an API key issue - show error instead
-        if 'Invalid openalgo apikey' in str(response.get('message', '')):
-            flash('Invalid API key. Please generate a new API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
         return redirect(url_for('auth.logout'))
 
     tradebook_data = response.get('data', [])
@@ -232,34 +219,29 @@ def positions():
     if analyze_mode or paper_trading:
         # Get API key for sandbox/paper trading mode
         api_key = get_api_key_for_tradingview(login_username)
-        logger.info(f"API key retrieval for user {login_username}: {'Found' if api_key else 'NOT FOUND'}, length: {len(api_key) if api_key else 0}")
         if api_key:
-            logger.debug(f"API key first 10 chars: {api_key[:10]}... (last 4: ...{api_key[-4:]})")
             success, response, status_code = get_positionbook(api_key=api_key)
         else:
-            logger.error(f"No API key found for user {login_username} in analyze/paper trading mode")
-            flash('API key required for paper trading mode. Please generate an API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
+            logger.error("No API key found for analyze/paper trading mode")
+            return "API key required for analyze/paper trading mode", 400
     else:
         # Live broker mode - check for auth token and broker
         auth_token = get_auth_token(login_username)
         if auth_token is None:
             logger.warning(f"No auth token found for user {login_username}")
             return redirect(url_for('auth.logout'))
+
         broker = session.get('broker')
         if not broker:
             logger.error("Broker not set in session")
             return "Broker not set in session", 400
+
         success, response, status_code = get_positionbook(auth_token=auth_token, broker=broker)
 
     if not success:
         logger.error(f"Failed to get positions data: {response.get('message', 'Unknown error')}")
         if status_code == 404:
             return "Failed to import broker module", 500
-        # Don't redirect to logout if it's an API key issue - show error instead
-        if 'Invalid openalgo apikey' in str(response.get('message', '')):
-            flash('Invalid API key. Please generate a new API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
         return redirect(url_for('auth.logout'))
 
     positions_data = response.get('data', [])
@@ -279,24 +261,23 @@ def holdings():
     if analyze_mode or paper_trading:
         # Get API key for sandbox/paper trading mode
         api_key = get_api_key_for_tradingview(login_username)
-        logger.info(f"API key retrieval for user {login_username}: {'Found' if api_key else 'NOT FOUND'}, length: {len(api_key) if api_key else 0}")
         if api_key:
-            logger.debug(f"API key first 10 chars: {api_key[:10]}... (last 4: ...{api_key[-4:]})")
             success, response, status_code = get_holdings(api_key=api_key)
         else:
-            logger.error(f"No API key found for user {login_username} in analyze/paper trading mode")
-            flash('API key required for paper trading mode. Please generate an API key in Settings → API Keys.', 'error')
-            return redirect(url_for('api_key_bp.manage_api_key'))
+            logger.error("No API key found for analyze/paper trading mode")
+            return "API key required for analyze/paper trading mode", 400
     else:
         # Live broker mode - check for auth token and broker
         auth_token = get_auth_token(login_username)
         if auth_token is None:
             logger.warning(f"No auth token found for user {login_username}")
             return redirect(url_for('auth.logout'))
+
         broker = session.get('broker')
         if not broker:
             logger.error("Broker not set in session")
             return "Broker not set in session", 400
+
         success, response, status_code = get_holdings(auth_token=auth_token, broker=broker)
 
     if not success:

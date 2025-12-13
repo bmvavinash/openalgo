@@ -312,89 +312,19 @@ def place_smart_order(
 
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
-        # ALWAYS try to verify API key first - if valid, check if we need broker auth
-        # In analyze mode, we don't need broker auth token
-        from services.sandbox_service import get_user_id_from_apikey
-        
-        # Verify API key is valid (this works regardless of analyze mode)
-        logger.info(f"[PlaceSmartOrder] Verifying API key... Key length: {len(api_key) if api_key else 0}")
-        try:
-            user_id = get_user_id_from_apikey(api_key)
-            logger.info(f"[PlaceSmartOrder] API key verification result: user_id={user_id}")
-        except Exception as e:
-            logger.error(f"[PlaceSmartOrder] Error verifying API key: {e}", exc_info=True)
-            user_id = None
-        
-        if not user_id:
-            logger.error(f"[PlaceSmartOrder] Invalid API key. Key length: {len(api_key) if api_key else 0}, first 10 chars: {api_key[:10] if api_key and len(api_key) >= 10 else 'N/A'}...")
-            error_response = {
-                'status': 'error',
-                'message': 'Invalid openalgo apikey'
-            }
-            return False, error_response, 403
-        
-        # API key is valid - now check analyze mode
-        try:
-            analyze_mode = get_analyze_mode()
-            logger.info(f"[PlaceSmartOrder] Analyze mode: {analyze_mode}, Valid API key for user_id: {user_id}")
-        except Exception as e:
-            logger.error(f"[PlaceSmartOrder] Error checking analyze mode: {e}")
-            analyze_mode = False
-        
-        # If in analyze mode, route to sandbox (no broker auth needed)
-        if analyze_mode:
-            from services.sandbox_service import sandbox_place_smart_order
-            
-            logger.info(f"[PlaceSmartOrder] Routing to sandbox (analyze mode) for user_id: {user_id}")
-            
-            # Route to sandbox smart order
-            success, response_data, status_code = sandbox_place_smart_order(
-                order_data,
-                api_key,
-                original_data
-            )
-            
-            # Store complete request data without apikey
-            analyzer_request = original_data.copy()
-            if 'apikey' in analyzer_request:
-                analyzer_request.pop('apikey', None)
-            analyzer_request['api_type'] = 'placesmartorder'
-            
-            # Log to analyzer database
-            executor.submit(async_log_analyzer, analyzer_request, response_data, 'placesmartorder')
-            
-            # Emit socket event for toast notification
-            socketio.start_background_task(
-                socketio.emit,
-                'analyzer_update',
-                {
-                    'request': analyzer_request,
-                    'response': response_data
-                }
-            )
-            
-            # Send Telegram alert
-            telegram_alert_service.send_order_alert('placesmartorder', order_data, response_data, api_key)
-            return success, response_data, status_code
-        
         # Check if order should be routed to Action Center (semi-auto mode)
         from services.order_router_service import should_route_to_pending, queue_order
 
         if should_route_to_pending(api_key, 'smartorder'):
             return queue_order(api_key, original_data, 'smartorder')
 
-        # Live mode - require broker auth token
-        # API key is already verified above, now check for broker auth token
-        logger.info(f"[PlaceSmartOrder] Live mode - checking for broker auth token for user_id: {user_id}")
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
-            # API key is valid but no broker auth - this is OK in analyze mode, but we already checked that
-            # In live mode, broker auth is required
-            logger.warning(f"[PlaceSmartOrder] Valid API key but no broker auth token found for user_id: {user_id}")
             error_response = {
                 'status': 'error',
-                'message': 'Broker authentication required. Please login with your broker credentials.'
+                'message': 'Invalid openalgo apikey'
             }
+            # Skip logging for invalid API keys to prevent database flooding
             return False, error_response, 403
 
         return place_smart_order_with_auth(order_data, AUTH_TOKEN, broker_name, original_data, smart_order_delay)

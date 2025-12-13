@@ -401,7 +401,6 @@ def verify_api_key(provided_api_key):
     try:
         # Query all API keys
         api_keys = ApiKeys.query.all()
-        logger.info(f"[verify_api_key] Checking {len(api_keys)} API keys in database. Provided key length: {len(provided_api_key)}")
 
         # Try to verify against each stored hash
         for api_key_obj in api_keys:
@@ -409,7 +408,7 @@ def verify_api_key(provided_api_key):
                 ph.verify(api_key_obj.api_key_hash, peppered_key)
                 # Valid key found - cache it
                 verified_api_key_cache[cache_key] = api_key_obj.user_id
-                logger.info(f"[verify_api_key] ✅ API key verified and cached for user_id: {api_key_obj.user_id}")
+                logger.debug(f"API key verified and cached for user_id: {api_key_obj.user_id}")
                 return api_key_obj.user_id
             except VerifyMismatchError:
                 continue
@@ -417,7 +416,7 @@ def verify_api_key(provided_api_key):
         # If we reach here, the API key is invalid
         # Cache the invalid result to prevent repeated expensive verifications
         invalid_api_key_cache[cache_key] = True
-        logger.warning(f"[verify_api_key] ❌ Invalid API key - no match found in database. Key length: {len(provided_api_key)}, first 10 chars: {provided_api_key[:10] if len(provided_api_key) >= 10 else 'N/A'}...")
+        logger.debug(f"Invalid API key cached")
 
         # Track the invalid attempt
         try:

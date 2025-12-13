@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime, Time
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, DateTime, Time, Float
 from sqlalchemy.orm import scoped_session, sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -46,6 +46,8 @@ class Strategy(Base):
     start_time = Column(String(5))  # HH:MM format
     end_time = Column(String(5))  # HH:MM format
     squareoff_time = Column(String(5))  # HH:MM format
+    scalping_enabled = Column(Boolean, default=False)  # Enable scalping for this strategy
+    stop_loss_pct = Column(Float, default=None)  # Stop loss percentage (required if scalping enabled)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

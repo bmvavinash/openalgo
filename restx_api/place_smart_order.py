@@ -42,12 +42,6 @@ class SmartOrder(Resource):
             # Extract API key
             api_key = order_data.pop('apikey', None)
             
-            # Log API key and analyze mode for debugging
-            analyze_mode = get_analyze_mode()
-            logger.info(f"[PlaceSmartOrder API] Analyze mode: {analyze_mode}, API key provided: {bool(api_key)}, length: {len(api_key) if api_key else 0}")
-            if api_key:
-                logger.debug(f"[PlaceSmartOrder API] API key first 10 chars: {api_key[:10]}... (last 4: ...{api_key[-4:]})")
-            
             # Call the service function to place the smart order
             success, response_data, status_code = place_smart_order(
                 order_data=order_data,

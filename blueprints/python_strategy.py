@@ -380,6 +380,13 @@ def start_strategy_process(strategy_id):
         if not config:
             return False, "Strategy configuration not found"
         
+        # Validate scalping configuration
+        scalping_enabled = config.get('scalping_enabled', False)
+        stop_loss_pct = config.get('stop_loss_pct')
+        if scalping_enabled:
+            if not stop_loss_pct or stop_loss_pct < 0.25:
+                return False, "Stop loss percentage must be at least 0.25% when scalping is enabled"
+        
         file_path = Path(config['file_path'])
         if not file_path.exists():
             return False, f"Strategy file not found: {file_path}"
@@ -448,6 +455,41 @@ def start_strategy_process(strategy_id):
             
             # Load and set environment variables
             env_vars = load_env_variables(strategy_id)
+            
+            # Ensure scalping config is passed as environment variables
+            if scalping_enabled:
+                env_vars['STRATEGY_SCALPING_ENABLED'] = 'true'
+            else:
+                env_vars['STRATEGY_SCALPING_ENABLED'] = 'false'
+            
+            if stop_loss_pct is not None:
+                env_vars['STRATEGY_STOP_LOSS_PCT'] = str(stop_loss_pct)
+            
+            # Also get API key and host for strategies
+            try:
+                from database.auth_db import get_api_key_for_tradingview
+                strategy_user_id = config.get('user_id')
+                if strategy_user_id:
+                    api_key = get_api_key_for_tradingview(strategy_user_id)
+                    if api_key:
+                        env_vars['OPENALGO_API_KEY'] = api_key
+                
+                # Fallback to .env file if no API key found
+                if 'OPENALGO_API_KEY' not in env_vars:
+                    env_key = os.getenv('OPENALGO_API_KEY')
+                    if env_key:
+                        env_vars['OPENALGO_API_KEY'] = env_key
+            except Exception as e:
+                logger.warning(f"Could not load API key for strategy: {e}")
+                # Fallback to .env file
+                env_key = os.getenv('OPENALGO_API_KEY')
+                if env_key:
+                    env_vars['OPENALGO_API_KEY'] = env_key
+            
+            # Get host from config or default
+            host = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
+            env_vars['OPENALGO_HOST'] = host
+            
             if env_vars:
                 # Start with current environment
                 process_env = os.environ.copy()
@@ -455,6 +497,7 @@ def start_strategy_process(strategy_id):
                 process_env.update(env_vars)
                 subprocess_args['env'] = process_env
                 logger.info(f"Loaded {len(env_vars)} environment variables for strategy {strategy_id}")
+                logger.debug(f"Scalping enabled: {scalping_enabled}, Stop loss: {stop_loss_pct}%")
             
             # Start the process
             # Use Python unbuffered mode for real-time output
@@ -846,17 +889,60 @@ def new_strategy():
             
             # Get form data
             strategy_name = request.form.get('strategy_name', Path(file.filename).stem)
+            scalping_enabled = request.form.get('scalping_enabled') == '1'
+            stop_loss_pct = request.form.get('stop_loss_pct')
             
-            # Save configuration (no params needed)
+            # Validate scalping configuration
+            if scalping_enabled:
+                if not stop_loss_pct:
+                    flash('Stop loss percentage is required when scalping is enabled', 'error')
+                    return redirect(request.url)
+                try:
+                    stop_loss_pct = float(stop_loss_pct)
+                    if stop_loss_pct < 0.25:
+                        flash('Stop loss percentage must be at least 0.25% when scalping is enabled', 'error')
+                        return redirect(request.url)
+                except ValueError:
+                    flash('Invalid stop loss percentage. Please enter a valid number.', 'error')
+                    return redirect(request.url)
+            elif stop_loss_pct:
+                # Stop loss is optional but if provided, validate it
+                try:
+                    stop_loss_pct = float(stop_loss_pct)
+                    if stop_loss_pct <= 0:
+                        flash('Stop loss percentage must be greater than 0', 'error')
+                        return redirect(request.url)
+                except ValueError:
+                    flash('Invalid stop loss percentage. Please enter a valid number.', 'error')
+                    return redirect(request.url)
+            else:
+                stop_loss_pct = None
+            
+            # Save configuration
             STRATEGY_CONFIGS[strategy_id] = {
                 'name': strategy_name,
                 'file_path': str(file_path),
                 'is_running': False,
                 'is_scheduled': False,
                 'created_at': ist_now.isoformat(),
-                'user_id': user_id
+                'user_id': user_id,
+                'scalping_enabled': scalping_enabled,
+                'stop_loss_pct': stop_loss_pct
             }
             save_configs()
+            
+            # Save scalping config as environment variables
+            env_vars = {}
+            if scalping_enabled:
+                env_vars['STRATEGY_SCALPING_ENABLED'] = 'true'
+            else:
+                env_vars['STRATEGY_SCALPING_ENABLED'] = 'false'
+            
+            if stop_loss_pct is not None:
+                env_vars['STRATEGY_STOP_LOSS_PCT'] = str(stop_loss_pct)
+            
+            if env_vars:
+                save_env_variables(strategy_id, env_vars)
             
             flash(f'Strategy "{strategy_name}" uploaded successfully', 'success')
             return redirect(url_for('python_strategy_bp.index'))
