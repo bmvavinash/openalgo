@@ -822,11 +822,321 @@ def backtest_bear_put_spread(
     
     return trades
 
+# ==================== IRON BUTTERFLY STRATEGY ====================
+
+def backtest_iron_butterfly(
+    engine: OptionBacktestEngine,
+    df: pd.DataFrame,
+    config: BacktestConfig,
+    wing_otm: int = 5
+) -> List[Trade]:
+    """Backtest Iron Butterfly strategy: Sell ATM Call + Put, Buy OTM Call + Put"""
+    trades = []
+    
+    if len(df) < 10:
+        return trades
+    
+    # Similar to Iron Condor but with ATM short strikes
+    # Implementation similar to iron condor but with ATM instead of OTM for shorts
+    return backtest_iron_condor(engine, df, config, sell_otm=0, buy_otm=wing_otm)
+
+# ==================== PROTECTIVE PUT STRATEGY ====================
+
+def backtest_protective_put(
+    engine: OptionBacktestEngine,
+    df: pd.DataFrame,
+    config: BacktestConfig,
+    put_offset: str = "OTM2"
+) -> List[Trade]:
+    """Backtest Protective Put strategy: Long underlying + Buy Put"""
+    trades = []
+    
+    if len(df) < 10:
+        return trades
+    
+    # This strategy assumes you already have a long position in underlying
+    # We'll simulate buying a put to protect the position
+    start_date = df['timestamp'].iloc[0]
+    expiry_date = engine.get_expiry_date(start_date)
+    
+    spot = df['close'].iloc[0]
+    put_strike = engine.get_strike_from_offset(spot, put_offset, "PE")
+    
+    put_entry_price = engine.simulate_option_price(
+        spot, put_strike, expiry_date, start_date, "PE"
+    )
+    put_entry_price = engine.apply_slippage(put_entry_price, "BUY")
+    
+    # Track position
+    put_position = {
+        'strike': put_strike,
+        'entry_price': put_entry_price,
+        'entry_time': start_date,
+        'quantity': config.quantity
+    }
+    
+    # Monitor for exit
+    for i in range(1, len(df)):
+        current_time = df['timestamp'].iloc[i]
+        spot = df['close'].iloc[i]
+        
+        put_price = engine.simulate_option_price(
+            spot, put_position['strike'], expiry_date, current_time, "PE"
+        )
+        
+        # Simple exit: close if profitable or at expiry
+        days_to_expiry = (expiry_date - current_time).days
+        holding_days = (current_time - start_date).days
+        
+        exit_reason = None
+        if current_time >= expiry_date:
+            exit_reason = "EXPIRY"
+        elif days_to_expiry <= config.time_based_exit_days:
+            exit_reason = "TIME_BASED"
+        elif holding_days >= config.max_holding_days:
+            exit_reason = "MAX_HOLDING"
+        
+        if exit_reason:
+            put_exit_price = engine.apply_slippage(put_price, "SELL")
+            
+            trade = Trade(
+                entry_time=put_position['entry_time'],
+                exit_time=current_time,
+                strategy="Protective Put",
+                underlying=config.underlying,
+                symbol=f"{config.underlying}{int(put_position['strike'])}PE",
+                option_type="PE",
+                strike=put_position['strike'],
+                action="BUY",
+                quantity=config.quantity,
+                entry_price=put_position['entry_price'],
+                exit_price=put_exit_price,
+                pnl=(put_exit_price - put_position['entry_price']) * config.quantity,
+                exit_reason=exit_reason,
+                holding_days=holding_days
+            )
+            trades.append(trade)
+            break
+    
+    return trades
+
+# ==================== COVERED CALL STRATEGY ====================
+
+def backtest_covered_call(
+    engine: OptionBacktestEngine,
+    df: pd.DataFrame,
+    config: BacktestConfig,
+    call_otm: int = 2
+) -> List[Trade]:
+    """Backtest Covered Call strategy: Long underlying + Sell Call"""
+    trades = []
+    
+    if len(df) < 10:
+        return trades
+    
+    # This strategy assumes you already have a long position in underlying
+    # We'll simulate selling a call against the position
+    start_date = df['timestamp'].iloc[0]
+    expiry_date = engine.get_expiry_date(start_date)
+    
+    spot = df['close'].iloc[0]
+    call_strike = engine.get_strike_from_offset(spot, f"OTM{call_otm}", "CE")
+    
+    call_entry_price = engine.simulate_option_price(
+        spot, call_strike, expiry_date, start_date, "CE"
+    )
+    call_entry_price = engine.apply_slippage(call_entry_price, "SELL")
+    
+    # Track position
+    call_position = {
+        'strike': call_strike,
+        'entry_price': call_entry_price,
+        'entry_time': start_date,
+        'quantity': config.quantity
+    }
+    
+    # Monitor for exit
+    for i in range(1, len(df)):
+        current_time = df['timestamp'].iloc[i]
+        spot = df['close'].iloc[i]
+        
+        call_price = engine.simulate_option_price(
+            spot, call_position['strike'], expiry_date, current_time, "CE"
+        )
+        
+        days_to_expiry = (expiry_date - current_time).days
+        holding_days = (current_time - start_date).days
+        
+        exit_reason = None
+        if current_time >= expiry_date:
+            exit_reason = "EXPIRY"
+        elif days_to_expiry <= config.time_based_exit_days:
+            exit_reason = "TIME_BASED"
+        elif holding_days >= config.max_holding_days:
+            exit_reason = "MAX_HOLDING"
+        
+        if exit_reason:
+            call_exit_price = engine.apply_slippage(call_price, "BUY")
+            
+            trade = Trade(
+                entry_time=call_position['entry_time'],
+                exit_time=current_time,
+                strategy="Covered Call",
+                underlying=config.underlying,
+                symbol=f"{config.underlying}{int(call_position['strike'])}CE",
+                option_type="CE",
+                strike=call_position['strike'],
+                action="SELL",
+                quantity=config.quantity,
+                entry_price=call_position['entry_price'],
+                exit_price=call_exit_price,
+                pnl=(call_position['entry_price'] - call_exit_price) * config.quantity,  # Reversed for SELL
+                exit_reason=exit_reason,
+                holding_days=holding_days
+            )
+            trades.append(trade)
+            break
+    
+    return trades
+
+# ==================== CALENDAR SPREAD STRATEGY ====================
+
+def backtest_calendar_spread(
+    engine: OptionBacktestEngine,
+    df: pd.DataFrame,
+    config: BacktestConfig,
+    strike_offset: str = "ATM",
+    option_type: str = "CE"
+) -> List[Trade]:
+    """Backtest Calendar Spread: Sell near-term + Buy far-term"""
+    trades = []
+    
+    if len(df) < 10:
+        return trades
+    
+    # Calendar spread requires two different expiry dates
+    # For simplicity, we'll use current expiry and next expiry
+    start_date = df['timestamp'].iloc[0]
+    near_expiry = engine.get_expiry_date(start_date)
+    far_expiry = near_expiry + timedelta(days=7)  # Next week's expiry
+    
+    spot = df['close'].iloc[0]
+    strike = engine.get_strike_from_offset(spot, strike_offset, option_type)
+    
+    # Sell near-term
+    near_entry_price = engine.simulate_option_price(
+        spot, strike, near_expiry, start_date, option_type
+    )
+    near_entry_price = engine.apply_slippage(near_entry_price, "SELL")
+    
+    # Buy far-term
+    far_entry_price = engine.simulate_option_price(
+        spot, strike, far_expiry, start_date, option_type
+    )
+    far_entry_price = engine.apply_slippage(far_entry_price, "BUY")
+    
+    net_premium = (far_entry_price - near_entry_price) * config.quantity
+    
+    # Track positions
+    near_position = {
+        'strike': strike,
+        'entry_price': near_entry_price,
+        'entry_time': start_date,
+        'expiry': near_expiry,
+        'quantity': config.quantity
+    }
+    
+    far_position = {
+        'strike': strike,
+        'entry_price': far_entry_price,
+        'entry_time': start_date,
+        'expiry': far_expiry,
+        'quantity': config.quantity
+    }
+    
+    # Monitor for exit
+    for i in range(1, len(df)):
+        current_time = df['timestamp'].iloc[i]
+        spot = df['close'].iloc[i]
+        
+        near_price = engine.simulate_option_price(
+            spot, strike, near_expiry, current_time, option_type
+        )
+        far_price = engine.simulate_option_price(
+            spot, strike, far_expiry, current_time, option_type
+        )
+        
+        current_value = (far_price - near_price) * config.quantity
+        current_pnl = current_value - net_premium
+        pnl_pct = (current_pnl / abs(net_premium)) * 100 if net_premium != 0 else 0
+        
+        days_to_near_expiry = (near_expiry - current_time).days
+        holding_days = (current_time - start_date).days
+        
+        exit_reason = None
+        if current_time >= near_expiry:
+            exit_reason = "NEAR_EXPIRY"
+        elif pnl_pct >= config.profit_target_pct:
+            exit_reason = "PROFIT_TARGET"
+        elif pnl_pct <= -config.stop_loss_pct:
+            exit_reason = "STOP_LOSS"
+        elif days_to_near_expiry <= config.time_based_exit_days:
+            exit_reason = "TIME_BASED"
+        elif holding_days >= config.max_holding_days:
+            exit_reason = "MAX_HOLDING"
+        
+        if exit_reason:
+            near_exit_price = engine.apply_slippage(near_price, "BUY")
+            far_exit_price = engine.apply_slippage(far_price, "SELL")
+            
+            near_trade = Trade(
+                entry_time=near_position['entry_time'],
+                exit_time=current_time,
+                strategy="Calendar Spread",
+                underlying=config.underlying,
+                symbol=f"{config.underlying}{int(strike)}{option_type}",
+                option_type=option_type,
+                strike=strike,
+                action="SELL",
+                quantity=config.quantity,
+                entry_price=near_position['entry_price'],
+                exit_price=near_exit_price,
+                pnl=(near_position['entry_price'] - near_exit_price) * config.quantity,
+                exit_reason=exit_reason,
+                holding_days=holding_days
+            )
+            
+            far_trade = Trade(
+                entry_time=far_position['entry_time'],
+                exit_time=current_time,
+                strategy="Calendar Spread",
+                underlying=config.underlying,
+                symbol=f"{config.underlying}{int(strike)}{option_type}",
+                option_type=option_type,
+                strike=strike,
+                action="BUY",
+                quantity=config.quantity,
+                entry_price=far_position['entry_price'],
+                exit_price=far_exit_price,
+                pnl=(far_exit_price - far_position['entry_price']) * config.quantity,
+                exit_reason=exit_reason,
+                holding_days=holding_days
+            )
+            
+            trades.extend([near_trade, far_trade])
+            break
+    
+    return trades
+
 # Strategy mapping
 STRATEGY_BACKTESTS = {
     "Straddle": backtest_straddle,
     "Strangle": backtest_strangle,
     "Iron Condor": backtest_iron_condor,
+    "Iron Butterfly": backtest_iron_butterfly,
     "Bull Call Spread": backtest_bull_call_spread,
     "Bear Put Spread": backtest_bear_put_spread,
+    "Protective Put": backtest_protective_put,
+    "Covered Call": backtest_covered_call,
+    "Calendar Spread": backtest_calendar_spread,
 }
