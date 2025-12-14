@@ -1,0 +1,9 @@
+======================================================================
+ITERATIVE BACKTEST OPTIMIZATION SUMMARY
+======================================================================
+
+Total Iterations: 5
+Total Backtests: 135
+
+Iteration 1:
+  Profitable: 12/27

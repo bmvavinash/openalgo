@@ -1,0 +1,26 @@
+======================================================================
+ITERATIVE BACKTEST OPTIMIZATION SUMMARY
+======================================================================
+
+Total Iterations: 4
+Total Backtests: 115
+
+Iteration 1:
+  Profitable: 13/23
+  Avg PnL: Rs-88.47
+
+Iteration 2:
+  Profitable: 11/23
+  Avg PnL: Rs1305.29
+
+Iteration 3:
+  Profitable: 13/23
+  Avg PnL: Rs1972.20
+
+Iteration 4:
+  Profitable: 13/23
+  Avg PnL: Rs1976.47
+
+FINAL RESULTS:
+  Profitable Ratio: 54.8%
+  Average PnL: Rs1429.25

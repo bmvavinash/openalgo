@@ -1,0 +1,292 @@
+======================================================================
+OPTION STRATEGY BACKTEST ANALYSIS
+======================================================================
+
+Total Backtests: 135
+[PROFITABLE] 60 (44.4%)
+[LOSING] 75 (55.6%)
+
+[PROFITABLE] STRATEGIES:
+----------------------------------------------------------------------
+1. Straddle             | 1week      | PnL: Rs  31576.49 | Win Rate:  50.0%
+2. Straddle             | 1month     | PnL: Rs  31576.49 | Win Rate:  50.0%
+3. Straddle             | 1week      | PnL: Rs  31576.49 | Win Rate:  50.0%
+4. Straddle             | 1month     | PnL: Rs  31576.49 | Win Rate:  50.0%
+5. Straddle             | 1week      | PnL: Rs  31576.49 | Win Rate:  50.0%
+6. Straddle             | 1month     | PnL: Rs  31576.49 | Win Rate:  50.0%
+7. Straddle             | 1week      | PnL: Rs  31576.49 | Win Rate:  50.0%
+8. Straddle             | 1month     | PnL: Rs  31576.49 | Win Rate:  50.0%
+9. Straddle             | 1week      | PnL: Rs  31576.49 | Win Rate:  50.0%
+10. Straddle             | 1month     | PnL: Rs  31576.49 | Win Rate:  50.0%
+11. Strangle             | 1week      | PnL: Rs  24322.46 | Win Rate:  50.0%
+12. Strangle             | 1month     | PnL: Rs  24322.46 | Win Rate:  50.0%
+13. Strangle             | 1week      | PnL: Rs  24322.46 | Win Rate:  50.0%
+14. Strangle             | 1month     | PnL: Rs  24322.46 | Win Rate:  50.0%
+15. Strangle             | 1week      | PnL: Rs  24322.46 | Win Rate:  50.0%
+16. Strangle             | 1month     | PnL: Rs  24322.46 | Win Rate:  50.0%
+17. Strangle             | 1week      | PnL: Rs  24322.46 | Win Rate:  50.0%
+18. Strangle             | 1month     | PnL: Rs  24322.46 | Win Rate:  50.0%
+19. Strangle             | 1week      | PnL: Rs  24322.46 | Win Rate:  50.0%
+20. Strangle             | 1month     | PnL: Rs  24322.46 | Win Rate:  50.0%
+21. Bull Call Spread     | 1week      | PnL: Rs  11891.96 | Win Rate: 100.0%
+22. Bull Call Spread     | 1month     | PnL: Rs  11891.96 | Win Rate: 100.0%
+23. Bull Call Spread     | 1week      | PnL: Rs  11891.96 | Win Rate: 100.0%
+24. Bull Call Spread     | 1month     | PnL: Rs  11891.96 | Win Rate: 100.0%
+25. Bull Call Spread     | 1week      | PnL: Rs  11891.96 | Win Rate: 100.0%
+26. Bull Call Spread     | 1month     | PnL: Rs  11891.96 | Win Rate: 100.0%
+27. Bull Call Spread     | 1week      | PnL: Rs  11891.96 | Win Rate: 100.0%
+28. Bull Call Spread     | 1month     | PnL: Rs  11891.96 | Win Rate: 100.0%
+29. Bull Call Spread     | 1week      | PnL: Rs  11891.96 | Win Rate: 100.0%
+30. Bull Call Spread     | 1month     | PnL: Rs  11891.96 | Win Rate: 100.0%
+31. Covered Call         | yesterday  | PnL: Rs   4529.51 | Win Rate: 100.0%
+32. Covered Call         | yesterday  | PnL: Rs   4529.51 | Win Rate: 100.0%
+33. Covered Call         | yesterday  | PnL: Rs   4529.51 | Win Rate: 100.0%
+34. Covered Call         | yesterday  | PnL: Rs   4529.51 | Win Rate: 100.0%
+35. Covered Call         | yesterday  | PnL: Rs   4529.51 | Win Rate: 100.0%
+36. Calendar Spread      | yesterday  | PnL: Rs   3412.99 | Win Rate:  50.0%
+37. Calendar Spread      | yesterday  | PnL: Rs   3412.99 | Win Rate:  50.0%
+38. Calendar Spread      | yesterday  | PnL: Rs   3412.99 | Win Rate:  50.0%
+39. Calendar Spread      | yesterday  | PnL: Rs   3412.99 | Win Rate:  50.0%
+40. Calendar Spread      | yesterday  | PnL: Rs   3412.99 | Win Rate:  50.0%
+41. Calendar Spread      | 1week      | PnL: Rs   3167.93 | Win Rate:  50.0%
+42. Calendar Spread      | 1month     | PnL: Rs   3167.93 | Win Rate:  50.0%
+43. Calendar Spread      | 1week      | PnL: Rs   3167.93 | Win Rate:  50.0%
+44. Calendar Spread      | 1month     | PnL: Rs   3167.93 | Win Rate:  50.0%
+45. Calendar Spread      | 1week      | PnL: Rs   3167.93 | Win Rate:  50.0%
+46. Calendar Spread      | 1month     | PnL: Rs   3167.93 | Win Rate:  50.0%
+47. Calendar Spread      | 1week      | PnL: Rs   3167.93 | Win Rate:  50.0%
+48. Calendar Spread      | 1month     | PnL: Rs   3167.93 | Win Rate:  50.0%
+49. Calendar Spread      | 1week      | PnL: Rs   3167.93 | Win Rate:  50.0%
+50. Calendar Spread      | 1month     | PnL: Rs   3167.93 | Win Rate:  50.0%
+51. Bear Put Spread      | yesterday  | PnL: Rs   2339.86 | Win Rate:  50.0%
+52. Bear Put Spread      | yesterday  | PnL: Rs   2339.86 | Win Rate:  50.0%
+53. Bear Put Spread      | yesterday  | PnL: Rs   2339.86 | Win Rate:  50.0%
+54. Bear Put Spread      | yesterday  | PnL: Rs   2339.86 | Win Rate:  50.0%
+55. Bear Put Spread      | yesterday  | PnL: Rs   2339.86 | Win Rate:  50.0%
+56. Iron Condor          | yesterday  | PnL: Rs    165.78 | Win Rate:  50.0%
+57. Iron Condor          | yesterday  | PnL: Rs    165.78 | Win Rate:  50.0%
+58. Iron Condor          | yesterday  | PnL: Rs    165.78 | Win Rate:  50.0%
+59. Iron Condor          | yesterday  | PnL: Rs    165.78 | Win Rate:  50.0%
+60. Iron Condor          | yesterday  | PnL: Rs    165.78 | Win Rate:  50.0%
+
+[LOSING] STRATEGIES:
+----------------------------------------------------------------------
+1. Covered Call         | 1week      | PnL: Rs -31946.47 | Win Rate:   0.0%
+2. Covered Call         | 1month     | PnL: Rs -31946.47 | Win Rate:   0.0%
+3. Covered Call         | 1week      | PnL: Rs -31946.47 | Win Rate:   0.0%
+4. Covered Call         | 1month     | PnL: Rs -31946.47 | Win Rate:   0.0%
+5. Covered Call         | 1week      | PnL: Rs -31946.47 | Win Rate:   0.0%
+6. Covered Call         | 1month     | PnL: Rs -31946.47 | Win Rate:   0.0%
+7. Covered Call         | 1week      | PnL: Rs -31946.47 | Win Rate:   0.0%
+8. Covered Call         | 1month     | PnL: Rs -31946.47 | Win Rate:   0.0%
+9. Covered Call         | 1week      | PnL: Rs -31946.47 | Win Rate:   0.0%
+10. Covered Call         | 1month     | PnL: Rs -31946.47 | Win Rate:   0.0%
+11. Iron Condor          | 1week      | PnL: Rs -18423.07 | Win Rate:  50.0%
+12. Iron Condor          | 1month     | PnL: Rs -18423.07 | Win Rate:  50.0%
+13. Iron Condor          | 1week      | PnL: Rs -18423.07 | Win Rate:  50.0%
+14. Iron Condor          | 1month     | PnL: Rs -18423.07 | Win Rate:  50.0%
+15. Iron Condor          | 1week      | PnL: Rs -18423.07 | Win Rate:  50.0%
+16. Iron Condor          | 1month     | PnL: Rs -18423.07 | Win Rate:  50.0%
+17. Iron Condor          | 1week      | PnL: Rs -18423.07 | Win Rate:  50.0%
+18. Iron Condor          | 1month     | PnL: Rs -18423.07 | Win Rate:  50.0%
+19. Iron Condor          | 1week      | PnL: Rs -18423.07 | Win Rate:  50.0%
+20. Iron Condor          | 1month     | PnL: Rs -18423.07 | Win Rate:  50.0%
+21. Strangle             | yesterday  | PnL: Rs  -9076.62 | Win Rate:   0.0%
+22. Strangle             | yesterday  | PnL: Rs  -9076.62 | Win Rate:   0.0%
+23. Strangle             | yesterday  | PnL: Rs  -9076.62 | Win Rate:   0.0%
+24. Strangle             | yesterday  | PnL: Rs  -9076.62 | Win Rate:   0.0%
+25. Strangle             | yesterday  | PnL: Rs  -9076.62 | Win Rate:   0.0%
+26. Bear Put Spread      | 1week      | PnL: Rs  -7597.60 | Win Rate:  50.0%
+27. Bear Put Spread      | 1month     | PnL: Rs  -7597.60 | Win Rate:  50.0%
+28. Bear Put Spread      | 1week      | PnL: Rs  -7597.60 | Win Rate:  50.0%
+29. Bear Put Spread      | 1month     | PnL: Rs  -7597.60 | Win Rate:  50.0%
+30. Bear Put Spread      | 1week      | PnL: Rs  -7597.60 | Win Rate:  50.0%
+31. Bear Put Spread      | 1month     | PnL: Rs  -7597.60 | Win Rate:  50.0%
+32. Bear Put Spread      | 1week      | PnL: Rs  -7597.60 | Win Rate:  50.0%
+33. Bear Put Spread      | 1month     | PnL: Rs  -7597.60 | Win Rate:  50.0%
+34. Bear Put Spread      | 1week      | PnL: Rs  -7597.60 | Win Rate:  50.0%
+35. Bear Put Spread      | 1month     | PnL: Rs  -7597.60 | Win Rate:  50.0%
+36. Protective Put       | 1week      | PnL: Rs  -7502.06 | Win Rate:   0.0%
+37. Protective Put       | 1month     | PnL: Rs  -7502.06 | Win Rate:   0.0%
+38. Protective Put       | 1week      | PnL: Rs  -7502.06 | Win Rate:   0.0%
+39. Protective Put       | 1month     | PnL: Rs  -7502.06 | Win Rate:   0.0%
+40. Protective Put       | 1week      | PnL: Rs  -7502.06 | Win Rate:   0.0%
+41. Protective Put       | 1month     | PnL: Rs  -7502.06 | Win Rate:   0.0%
+42. Protective Put       | 1week      | PnL: Rs  -7502.06 | Win Rate:   0.0%
+43. Protective Put       | 1month     | PnL: Rs  -7502.06 | Win Rate:   0.0%
+44. Protective Put       | 1week      | PnL: Rs  -7502.06 | Win Rate:   0.0%
+45. Protective Put       | 1month     | PnL: Rs  -7502.06 | Win Rate:   0.0%
+46. Straddle             | yesterday  | PnL: Rs  -6802.83 | Win Rate:   0.0%
+47. Straddle             | yesterday  | PnL: Rs  -6802.83 | Win Rate:   0.0%
+48. Straddle             | yesterday  | PnL: Rs  -6802.83 | Win Rate:   0.0%
+49. Straddle             | yesterday  | PnL: Rs  -6802.83 | Win Rate:   0.0%
+50. Straddle             | yesterday  | PnL: Rs  -6802.83 | Win Rate:   0.0%
+51. Protective Put       | yesterday  | PnL: Rs  -4538.04 | Win Rate:   0.0%
+52. Protective Put       | yesterday  | PnL: Rs  -4538.04 | Win Rate:   0.0%
+53. Protective Put       | yesterday  | PnL: Rs  -4538.04 | Win Rate:   0.0%
+54. Protective Put       | yesterday  | PnL: Rs  -4538.04 | Win Rate:   0.0%
+55. Protective Put       | yesterday  | PnL: Rs  -4538.04 | Win Rate:   0.0%
+56. Bull Call Spread     | yesterday  | PnL: Rs  -2575.30 | Win Rate:  50.0%
+57. Bull Call Spread     | yesterday  | PnL: Rs  -2575.30 | Win Rate:  50.0%
+58. Bull Call Spread     | yesterday  | PnL: Rs  -2575.30 | Win Rate:  50.0%
+59. Bull Call Spread     | yesterday  | PnL: Rs  -2575.30 | Win Rate:  50.0%
+60. Bull Call Spread     | yesterday  | PnL: Rs  -2575.30 | Win Rate:  50.0%
+61. Iron Butterfly       | 1week      | PnL: Rs  -2271.02 | Win Rate:  50.0%
+62. Iron Butterfly       | 1month     | PnL: Rs  -2271.02 | Win Rate:  50.0%
+63. Iron Butterfly       | 1week      | PnL: Rs  -2271.02 | Win Rate:  50.0%
+64. Iron Butterfly       | 1month     | PnL: Rs  -2271.02 | Win Rate:  50.0%
+65. Iron Butterfly       | 1week      | PnL: Rs  -2271.02 | Win Rate:  50.0%
+66. Iron Butterfly       | 1month     | PnL: Rs  -2271.02 | Win Rate:  50.0%
+67. Iron Butterfly       | 1week      | PnL: Rs  -2271.02 | Win Rate:  50.0%
+68. Iron Butterfly       | 1month     | PnL: Rs  -2271.02 | Win Rate:  50.0%
+69. Iron Butterfly       | 1week      | PnL: Rs  -2271.02 | Win Rate:  50.0%
+70. Iron Butterfly       | 1month     | PnL: Rs  -2271.02 | Win Rate:  50.0%
+71. Iron Butterfly       | yesterday  | PnL: Rs  -2184.94 | Win Rate:  50.0%
+72. Iron Butterfly       | yesterday  | PnL: Rs  -2184.94 | Win Rate:  50.0%
+73. Iron Butterfly       | yesterday  | PnL: Rs  -2184.94 | Win Rate:  50.0%
+74. Iron Butterfly       | yesterday  | PnL: Rs  -2184.94 | Win Rate:  50.0%
+75. Iron Butterfly       | yesterday  | PnL: Rs  -2184.94 | Win Rate:  50.0%
+
+STRATEGY RANKINGS BY PERIOD:
+----------------------------------------------------------------------
+
+YESTERDAY:
+1. [PROFIT] Covered Call         | PnL: Rs   4529.51
+2. [PROFIT] Covered Call         | PnL: Rs   4529.51
+3. [PROFIT] Covered Call         | PnL: Rs   4529.51
+4. [PROFIT] Covered Call         | PnL: Rs   4529.51
+5. [PROFIT] Covered Call         | PnL: Rs   4529.51
+6. [PROFIT] Calendar Spread      | PnL: Rs   3412.99
+7. [PROFIT] Calendar Spread      | PnL: Rs   3412.99
+8. [PROFIT] Calendar Spread      | PnL: Rs   3412.99
+9. [PROFIT] Calendar Spread      | PnL: Rs   3412.99
+10. [PROFIT] Calendar Spread      | PnL: Rs   3412.99
+11. [PROFIT] Bear Put Spread      | PnL: Rs   2339.86
+12. [PROFIT] Bear Put Spread      | PnL: Rs   2339.86
+13. [PROFIT] Bear Put Spread      | PnL: Rs   2339.86
+14. [PROFIT] Bear Put Spread      | PnL: Rs   2339.86
+15. [PROFIT] Bear Put Spread      | PnL: Rs   2339.86
+16. [PROFIT] Iron Condor          | PnL: Rs    165.78
+17. [PROFIT] Iron Condor          | PnL: Rs    165.78
+18. [PROFIT] Iron Condor          | PnL: Rs    165.78
+19. [PROFIT] Iron Condor          | PnL: Rs    165.78
+20. [PROFIT] Iron Condor          | PnL: Rs    165.78
+21. [LOSS] Iron Butterfly       | PnL: Rs  -2184.94
+22. [LOSS] Iron Butterfly       | PnL: Rs  -2184.94
+23. [LOSS] Iron Butterfly       | PnL: Rs  -2184.94
+24. [LOSS] Iron Butterfly       | PnL: Rs  -2184.94
+25. [LOSS] Iron Butterfly       | PnL: Rs  -2184.94
+26. [LOSS] Bull Call Spread     | PnL: Rs  -2575.30
+27. [LOSS] Bull Call Spread     | PnL: Rs  -2575.30
+28. [LOSS] Bull Call Spread     | PnL: Rs  -2575.30
+29. [LOSS] Bull Call Spread     | PnL: Rs  -2575.30
+30. [LOSS] Bull Call Spread     | PnL: Rs  -2575.30
+31. [LOSS] Protective Put       | PnL: Rs  -4538.04
+32. [LOSS] Protective Put       | PnL: Rs  -4538.04
+33. [LOSS] Protective Put       | PnL: Rs  -4538.04
+34. [LOSS] Protective Put       | PnL: Rs  -4538.04
+35. [LOSS] Protective Put       | PnL: Rs  -4538.04
+36. [LOSS] Straddle             | PnL: Rs  -6802.83
+37. [LOSS] Straddle             | PnL: Rs  -6802.83
+38. [LOSS] Straddle             | PnL: Rs  -6802.83
+39. [LOSS] Straddle             | PnL: Rs  -6802.83
+40. [LOSS] Straddle             | PnL: Rs  -6802.83
+41. [LOSS] Strangle             | PnL: Rs  -9076.62
+42. [LOSS] Strangle             | PnL: Rs  -9076.62
+43. [LOSS] Strangle             | PnL: Rs  -9076.62
+44. [LOSS] Strangle             | PnL: Rs  -9076.62
+45. [LOSS] Strangle             | PnL: Rs  -9076.62
+
+1WEEK:
+1. [PROFIT] Straddle             | PnL: Rs  31576.49
+2. [PROFIT] Straddle             | PnL: Rs  31576.49
+3. [PROFIT] Straddle             | PnL: Rs  31576.49
+4. [PROFIT] Straddle             | PnL: Rs  31576.49
+5. [PROFIT] Straddle             | PnL: Rs  31576.49
+6. [PROFIT] Strangle             | PnL: Rs  24322.46
+7. [PROFIT] Strangle             | PnL: Rs  24322.46
+8. [PROFIT] Strangle             | PnL: Rs  24322.46
+9. [PROFIT] Strangle             | PnL: Rs  24322.46
+10. [PROFIT] Strangle             | PnL: Rs  24322.46
+11. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+12. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+13. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+14. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+15. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+16. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+17. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+18. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+19. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+20. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+21. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+22. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+23. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+24. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+25. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+26. [LOSS] Protective Put       | PnL: Rs  -7502.06
+27. [LOSS] Protective Put       | PnL: Rs  -7502.06
+28. [LOSS] Protective Put       | PnL: Rs  -7502.06
+29. [LOSS] Protective Put       | PnL: Rs  -7502.06
+30. [LOSS] Protective Put       | PnL: Rs  -7502.06
+31. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+32. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+33. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+34. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+35. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+36. [LOSS] Iron Condor          | PnL: Rs -18423.07
+37. [LOSS] Iron Condor          | PnL: Rs -18423.07
+38. [LOSS] Iron Condor          | PnL: Rs -18423.07
+39. [LOSS] Iron Condor          | PnL: Rs -18423.07
+40. [LOSS] Iron Condor          | PnL: Rs -18423.07
+41. [LOSS] Covered Call         | PnL: Rs -31946.47
+42. [LOSS] Covered Call         | PnL: Rs -31946.47
+43. [LOSS] Covered Call         | PnL: Rs -31946.47
+44. [LOSS] Covered Call         | PnL: Rs -31946.47
+45. [LOSS] Covered Call         | PnL: Rs -31946.47
+
+1MONTH:
+1. [PROFIT] Straddle             | PnL: Rs  31576.49
+2. [PROFIT] Straddle             | PnL: Rs  31576.49
+3. [PROFIT] Straddle             | PnL: Rs  31576.49
+4. [PROFIT] Straddle             | PnL: Rs  31576.49
+5. [PROFIT] Straddle             | PnL: Rs  31576.49
+6. [PROFIT] Strangle             | PnL: Rs  24322.46
+7. [PROFIT] Strangle             | PnL: Rs  24322.46
+8. [PROFIT] Strangle             | PnL: Rs  24322.46
+9. [PROFIT] Strangle             | PnL: Rs  24322.46
+10. [PROFIT] Strangle             | PnL: Rs  24322.46
+11. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+12. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+13. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+14. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+15. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+16. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+17. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+18. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+19. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+20. [PROFIT] Calendar Spread      | PnL: Rs   3167.93
+21. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+22. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+23. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+24. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+25. [LOSS] Iron Butterfly       | PnL: Rs  -2271.02
+26. [LOSS] Protective Put       | PnL: Rs  -7502.06
+27. [LOSS] Protective Put       | PnL: Rs  -7502.06
+28. [LOSS] Protective Put       | PnL: Rs  -7502.06
+29. [LOSS] Protective Put       | PnL: Rs  -7502.06
+30. [LOSS] Protective Put       | PnL: Rs  -7502.06
+31. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+32. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+33. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+34. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+35. [LOSS] Bear Put Spread      | PnL: Rs  -7597.60
+36. [LOSS] Iron Condor          | PnL: Rs -18423.07
+37. [LOSS] Iron Condor          | PnL: Rs -18423.07
+38. [LOSS] Iron Condor          | PnL: Rs -18423.07
+39. [LOSS] Iron Condor          | PnL: Rs -18423.07
+40. [LOSS] Iron Condor          | PnL: Rs -18423.07
+41. [LOSS] Covered Call         | PnL: Rs -31946.47
+42. [LOSS] Covered Call         | PnL: Rs -31946.47
+43. [LOSS] Covered Call         | PnL: Rs -31946.47
+44. [LOSS] Covered Call         | PnL: Rs -31946.47
+45. [LOSS] Covered Call         | PnL: Rs -31946.47
