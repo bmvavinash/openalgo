@@ -1,0 +1,56 @@
+======================================================================
+OPTION STRATEGY BACKTEST ANALYSIS
+======================================================================
+
+Total Backtests: 17
+[PROFITABLE] 17 (100.0%)
+[LOSING] 0 (0.0%)
+
+[PROFITABLE] STRATEGIES:
+----------------------------------------------------------------------
+1. Bull Call Spread     | 1week      | PnL: Rs  11891.96 | Win Rate: 100.0%
+2. Bull Call Spread     | 1month     | PnL: Rs  11891.96 | Win Rate: 100.0%
+3. Covered Call         | 1week      | PnL: Rs   5113.68 | Win Rate: 100.0%
+4. Covered Call         | 1month     | PnL: Rs   5113.68 | Win Rate: 100.0%
+5. Covered Call         | yesterday  | PnL: Rs   4492.16 | Win Rate: 100.0%
+6. Calendar Spread      | yesterday  | PnL: Rs   3412.99 | Win Rate:  50.0%
+7. Bear Put Spread      | 1week      | PnL: Rs   2292.57 | Win Rate:  50.0%
+8. Bear Put Spread      | 1month     | PnL: Rs   2292.57 | Win Rate:  50.0%
+9. Calendar Spread      | 1week      | PnL: Rs   2034.75 | Win Rate:  50.0%
+10. Calendar Spread      | 1month     | PnL: Rs   2034.75 | Win Rate:  50.0%
+11. Straddle             | 1week      | PnL: Rs   1317.91 | Win Rate:  50.0%
+12. Straddle             | 1month     | PnL: Rs   1317.91 | Win Rate:  50.0%
+13. Strangle             | 1week      | PnL: Rs   1317.91 | Win Rate:  50.0%
+14. Strangle             | 1month     | PnL: Rs   1317.91 | Win Rate:  50.0%
+15. Iron Condor          | yesterday  | PnL: Rs    129.88 | Win Rate:  50.0%
+16. Iron Condor          | 1week      | PnL: Rs     81.21 | Win Rate:  50.0%
+17. Iron Condor          | 1month     | PnL: Rs     81.21 | Win Rate:  50.0%
+
+[LOSING] STRATEGIES:
+----------------------------------------------------------------------
+
+STRATEGY RANKINGS BY PERIOD:
+----------------------------------------------------------------------
+
+YESTERDAY:
+1. [PROFIT] Covered Call         | PnL: Rs   4492.16
+2. [PROFIT] Calendar Spread      | PnL: Rs   3412.99
+3. [PROFIT] Iron Condor          | PnL: Rs    129.88
+
+1WEEK:
+1. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+2. [PROFIT] Covered Call         | PnL: Rs   5113.68
+3. [PROFIT] Bear Put Spread      | PnL: Rs   2292.57
+4. [PROFIT] Calendar Spread      | PnL: Rs   2034.75
+5. [PROFIT] Straddle             | PnL: Rs   1317.91
+6. [PROFIT] Strangle             | PnL: Rs   1317.91
+7. [PROFIT] Iron Condor          | PnL: Rs     81.21
+
+1MONTH:
+1. [PROFIT] Bull Call Spread     | PnL: Rs  11891.96
+2. [PROFIT] Covered Call         | PnL: Rs   5113.68
+3. [PROFIT] Bear Put Spread      | PnL: Rs   2292.57
+4. [PROFIT] Calendar Spread      | PnL: Rs   2034.75
+5. [PROFIT] Straddle             | PnL: Rs   1317.91
+6. [PROFIT] Strangle             | PnL: Rs   1317.91
+7. [PROFIT] Iron Condor          | PnL: Rs     81.21
