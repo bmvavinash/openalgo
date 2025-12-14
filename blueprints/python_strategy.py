@@ -815,6 +815,22 @@ def index():
                 config['pid'] = None
                 save_configs()
         
+        # Calculate profitability label
+        total_pnl = config.get('total_pnl', 0.0)
+        win_rate = config.get('win_rate', 0.0)
+        total_trades = config.get('total_trades', 0)
+        
+        profitability_label = 'unknown'
+        if total_trades > 0:
+            if total_pnl > 10000 and win_rate >= 70:
+                profitability_label = 'high_profit'
+            elif total_pnl > 0 and win_rate >= 50:
+                profitability_label = 'medium_profit'
+            elif total_pnl > 0:
+                profitability_label = 'low_profit'
+            else:
+                profitability_label = 'losses'
+        
         strategy_info = {
             'id': sid,
             'name': config.get('name', 'Unnamed'),
@@ -831,7 +847,14 @@ def index():
             'last_started': format_ist_time(config.get('last_started', '')),
             'last_stopped': format_ist_time(config.get('last_stopped', '')),
             'pid': config.get('pid'),
-            'params': {}  # No params needed in simplified version
+            'params': {},  # No params needed in simplified version
+            'strategy_type': config.get('strategy_type', 'intraday'),  # 'intraday' or 'options'
+            'profitability_label': profitability_label,  # 'high_profit', 'medium_profit', 'low_profit', 'losses', 'unknown'
+            'total_pnl': total_pnl,
+            'win_rate': win_rate,
+            'total_trades': total_trades,
+            'winning_trades': config.get('winning_trades', 0),
+            'losing_trades': config.get('losing_trades', 0)
         }
         
         # Add runtime info if running
@@ -918,6 +941,9 @@ def new_strategy():
             else:
                 stop_loss_pct = None
             
+            # Detect strategy type from filename/content
+            strategy_type = 'options' if 'option' in filename.lower() else 'intraday'
+            
             # Save configuration
             STRATEGY_CONFIGS[strategy_id] = {
                 'name': strategy_name,
@@ -927,7 +953,15 @@ def new_strategy():
                 'created_at': ist_now.isoformat(),
                 'user_id': user_id,
                 'scalping_enabled': scalping_enabled,
-                'stop_loss_pct': stop_loss_pct
+                'stop_loss_pct': stop_loss_pct,
+                'strategy_type': strategy_type,  # 'intraday' or 'options'
+                'profitability_label': 'unknown',  # Will be updated based on live performance
+                'total_pnl': 0.0,
+                'win_rate': 0.0,
+                'total_trades': 0,
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'last_pnl_update': None
             }
             save_configs()
             
@@ -1448,6 +1482,111 @@ def save_strategy(strategy_id):
     except Exception as e:
         logger.error(f"Failed to save strategy {strategy_id}: {e}")
         return jsonify({'success': False, 'message': f'Failed to save: {str(e)}'}), 500
+
+@python_strategy_bp.route('/performance/<strategy_id>')
+@check_session_validity
+def get_strategy_performance(strategy_id):
+    """Get performance data for a strategy"""
+    user_id = session.get('user')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Session expired'}), 401
+    
+    is_owner, error_response = verify_strategy_ownership(strategy_id, user_id)
+    if not is_owner:
+        return error_response
+    
+    try:
+        from services.strategy_performance_tracker import get_strategy_performance
+        perf_data = get_strategy_performance(strategy_id)
+        
+        if perf_data:
+            return jsonify({
+                'success': True,
+                'performance': perf_data
+            })
+        else:
+            return jsonify({
+                'success': True,
+                'performance': {
+                    'total_pnl': 0.0,
+                    'total_trades': 0,
+                    'win_rate': 0.0,
+                    'strategy_type': STRATEGY_CONFIGS.get(strategy_id, {}).get('strategy_type', 'intraday')
+                }
+            })
+    except Exception as e:
+        logger.error(f"Error getting performance: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@python_strategy_bp.route('/performance/daily')
+@check_session_validity
+def get_daily_performance():
+    """Get daily performance summary"""
+    try:
+        from services.strategy_performance_tracker import get_daily_summary
+        summary = get_daily_summary()
+        return jsonify({'success': True, 'summary': summary})
+    except Exception as e:
+        logger.error(f"Error getting daily performance: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@python_strategy_bp.route('/performance/update', methods=['POST'])
+@check_session_validity
+def update_performance():
+    """Update strategy performance (called from strategies)"""
+    try:
+        data = request.get_json()
+        strategy_id = data.get('strategy_id')
+        pnl = data.get('pnl', 0.0)
+        is_win = data.get('is_win', False)
+        strategy_type = data.get('strategy_type', 'intraday')
+        
+        if not strategy_id:
+            return jsonify({'success': False, 'message': 'strategy_id required'}), 400
+        
+        from services.strategy_performance_tracker import update_strategy_performance
+        update_strategy_performance(strategy_id, pnl, is_win, strategy_type)
+        
+        return jsonify({'success': True, 'message': 'Performance updated'})
+    except Exception as e:
+        logger.error(f"Error updating performance: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@python_strategy_bp.route('/analysis/daily')
+@check_session_validity
+def get_daily_analysis():
+    """Get daily performance analysis"""
+    try:
+        from services.live_market_analyzer import analyze_daily_performance
+        analysis = analyze_daily_performance()
+        return jsonify({'success': True, 'analysis': analysis})
+    except Exception as e:
+        logger.error(f"Error getting daily analysis: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@python_strategy_bp.route('/analysis/recommended')
+@check_session_validity
+def get_recommended_strategies():
+    """Get recommended strategies for live trading"""
+    try:
+        from services.live_market_analyzer import get_recommended_strategies
+        recommended = get_recommended_strategies()
+        return jsonify({'success': True, 'recommended': recommended})
+    except Exception as e:
+        logger.error(f"Error getting recommended strategies: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@python_strategy_bp.route('/analysis/report')
+@check_session_validity
+def get_end_of_day_report():
+    """Get end-of-day performance report"""
+    try:
+        from services.live_market_analyzer import generate_end_of_day_report
+        report = generate_end_of_day_report()
+        return jsonify({'success': True, 'report': report})
+    except Exception as e:
+        logger.error(f"Error generating report: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @python_strategy_bp.route('/env/<strategy_id>', methods=['GET', 'POST'])
 @check_session_validity

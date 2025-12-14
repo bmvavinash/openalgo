@@ -18,6 +18,49 @@
         </a>
     </div>
 
+    <!-- Filters -->
+    <div class="card bg-base-200 shadow-md mb-6">
+        <div class="card-body p-4">
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="form-control">
+                    <label class="label cursor-pointer gap-2">
+                        <span class="label-text">Filter by Type:</span>
+                        <select id="filter_type" class="select select-bordered select-sm" onchange="filterStrategies()">
+                            <option value="all">All Types</option>
+                            <option value="intraday">Intraday</option>
+                            <option value="options">Options</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="form-control">
+                    <label class="label cursor-pointer gap-2">
+                        <span class="label-text">Filter by Profitability:</span>
+                        <select id="filter_profitability" class="select select-bordered select-sm" onchange="filterStrategies()">
+                            <option value="all">All</option>
+                            <option value="high_profit">High Profit</option>
+                            <option value="medium_profit">Medium Profit</option>
+                            <option value="low_profit">Low Profit</option>
+                            <option value="losses">Losses</option>
+                            <option value="unknown">Unknown</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="form-control">
+                    <label class="label cursor-pointer gap-2">
+                        <span class="label-text">Sort by:</span>
+                        <select id="sort_by" class="select select-bordered select-sm" onchange="filterStrategies()">
+                            <option value="name">Name</option>
+                            <option value="pnl">Total PnL</option>
+                            <option value="win_rate">Win Rate</option>
+                            <option value="type">Type</option>
+                        </select>
+                    </label>
+                </div>
+                <button onclick="resetFilters()" class="btn btn-sm btn-ghost">Reset</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Status Summary with IST Time -->
     <div class="stats shadow w-full mb-8">
         <div class="stat">
@@ -78,14 +121,42 @@
 
     <!-- Strategy Cards -->
     {% if strategies %}
-    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" id="strategies_grid">
         {% for strategy in strategies %}
-        <div class="card bg-base-100 shadow-xl">
+        <div class="card bg-base-100 shadow-xl strategy-card" 
+             data-strategy-type="{{ strategy.strategy_type|default('intraday') }}"
+             data-profitability="{{ strategy.profitability_label|default('unknown') }}"
+             data-pnl="{{ strategy.total_pnl|default(0) }}"
+             data-win-rate="{{ strategy.win_rate|default(0) }}"
+             data-name="{{ strategy.name|lower }}">
             <div class="card-body">
                 <!-- Header with Status -->
                 <div class="flex justify-between items-start">
                     <h2 class="card-title">{{ strategy.name }}</h2>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 flex-wrap">
+                        <!-- Strategy Type Badge -->
+                        {% if strategy.strategy_type %}
+                        <span class="badge {% if strategy.strategy_type == 'options' %}badge-secondary{% else %}badge-primary{% endif %}">
+                            {{ strategy.strategy_type|upper }}
+                        </span>
+                        {% endif %}
+                        
+                        <!-- Profitability Badge -->
+                        {% if strategy.profitability_label %}
+                            {% if strategy.profitability_label == 'high_profit' %}
+                            <span class="badge badge-success">High Profit</span>
+                            {% elif strategy.profitability_label == 'medium_profit' %}
+                            <span class="badge badge-info">Medium Profit</span>
+                            {% elif strategy.profitability_label == 'low_profit' %}
+                            <span class="badge badge-warning">Low Profit</span>
+                            {% elif strategy.profitability_label == 'losses' %}
+                            <span class="badge badge-error">Losses</span>
+                            {% else %}
+                            <span class="badge badge-ghost">Unknown</span>
+                            {% endif %}
+                        {% endif %}
+                        
+                        <!-- Status Badge -->
                         {% if strategy.is_error %}
                             {% if 'master contract' in strategy.error_message|lower %}
                             <span class="badge badge-warning">Waiting</span>
@@ -142,6 +213,29 @@
                     <div class="flex justify-between">
                         <span class="font-semibold">Last Stopped:</span>
                         <span class="text-base-content/70 text-xs">{{ strategy.last_stopped }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Performance Metrics -->
+                    {% if strategy.total_trades > 0 %}
+                    <div class="divider my-2"></div>
+                    <div class="bg-base-200 rounded-lg p-3 space-y-1">
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold">Total PnL:</span>
+                            <span class="{% if strategy.total_pnl > 0 %}text-success{% elif strategy.total_pnl < 0 %}text-error{% else %}text-base-content/70{% endif %}">
+                                Rs {{ "%.2f"|format(strategy.total_pnl) }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold">Win Rate:</span>
+                            <span class="{% if strategy.win_rate >= 70 %}text-success{% elif strategy.win_rate >= 50 %}text-info{% else %}text-warning{% endif %}">
+                                {{ "%.1f"|format(strategy.win_rate) }}%
+                            </span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="font-semibold">Trades:</span>
+                            <span class="text-base-content/70">{{ strategy.total_trades }} ({{ strategy.winning_trades }}W / {{ strategy.losing_trades }}L)</span>
+                        </div>
                     </div>
                     {% endif %}
                     
@@ -896,5 +990,86 @@ setInterval(async () => {
         console.error('Failed to fetch status');
     }
 }, 10000);
+
+// Filter strategies
+function filterStrategies() {
+    const typeFilter = document.getElementById('filter_type').value;
+    const profitabilityFilter = document.getElementById('filter_profitability').value;
+    const sortBy = document.getElementById('sort_by').value;
+    
+    const cards = document.querySelectorAll('.strategy-card');
+    let visibleCount = 0;
+    
+    cards.forEach(card => {
+        const strategyType = card.getAttribute('data-strategy-type');
+        const profitability = card.getAttribute('data-profitability');
+        
+        let show = true;
+        
+        // Type filter
+        if (typeFilter !== 'all' && strategyType !== typeFilter) {
+            show = false;
+        }
+        
+        // Profitability filter
+        if (profitabilityFilter !== 'all' && profitability !== profitabilityFilter) {
+            show = false;
+        }
+        
+        // Show/hide card
+        if (show) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Sort visible cards
+    const grid = document.getElementById('strategies_grid');
+    const visibleCards = Array.from(cards).filter(c => c.style.display !== 'none');
+    
+    visibleCards.sort((a, b) => {
+        if (sortBy === 'name') {
+            return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+        } else if (sortBy === 'pnl') {
+            return parseFloat(b.getAttribute('data-pnl')) - parseFloat(a.getAttribute('data-pnl'));
+        } else if (sortBy === 'win_rate') {
+            return parseFloat(b.getAttribute('data-win-rate')) - parseFloat(a.getAttribute('data-win-rate'));
+        } else if (sortBy === 'type') {
+            return a.getAttribute('data-strategy-type').localeCompare(b.getAttribute('data-strategy-type'));
+        }
+        return 0;
+    });
+    
+    // Reorder in DOM
+    visibleCards.forEach(card => grid.appendChild(card));
+    
+    // Show message if no strategies visible
+    const emptyState = document.querySelector('.text-center.py-16');
+    if (visibleCount === 0 && cards.length > 0) {
+        if (!emptyState || emptyState.style.display === 'none') {
+            const msg = document.createElement('div');
+            msg.className = 'alert alert-info mt-4';
+            msg.innerHTML = '<span>No strategies match the selected filters</span>';
+            grid.parentNode.insertBefore(msg, grid);
+        }
+    } else if (emptyState) {
+        emptyState.remove();
+    }
+}
+
+// Reset filters
+function resetFilters() {
+    document.getElementById('filter_type').value = 'all';
+    document.getElementById('filter_profitability').value = 'all';
+    document.getElementById('sort_by').value = 'name';
+    filterStrategies();
+}
+
+// Initialize filters on page load
+document.addEventListener('DOMContentLoaded', function() {
+    filterStrategies();
+});
 </script>
 {% endblock %}
