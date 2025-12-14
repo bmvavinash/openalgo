@@ -7,8 +7,13 @@ Profits from large price movements in either direction
 from openalgo import api
 import os
 import time
+import sys
 from datetime import datetime
+from pathlib import Path
 import threading
+
+# Add parent directory for performance tracking
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 # Get API key from environment
 api_key = os.getenv('OPENALGO_API_KEY', os.getenv('OPENALGO_APIKEY'))
@@ -131,6 +136,32 @@ def close_straddle():
         
         positions['is_open'] = False
         print(f"[{datetime.now()}] {strategy_name} closed")
+        
+        # Calculate and update performance
+        try:
+            # Estimate PnL (in real implementation, get actual prices)
+            estimated_pnl = 0.0  # Placeholder - should calculate from entry/exit prices
+            is_win = estimated_pnl > 0
+            
+            # Update performance tracker
+            try:
+                import requests
+                strategy_id = os.getenv('STRATEGY_ID', f'option_straddle_{datetime.now().strftime("%Y%m%d%H%M%S")}')
+                requests.post(
+                    f"{os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')}/python/performance/update",
+                    json={
+                        'strategy_id': strategy_id,
+                        'pnl': estimated_pnl,
+                        'is_win': is_win,
+                        'strategy_type': 'options'
+                    },
+                    timeout=2
+                )
+            except:
+                pass  # Silently fail if tracker unavailable
+        except:
+            pass
+        
         return True
         
     except Exception as e:
@@ -169,3 +200,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
