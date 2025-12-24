@@ -108,13 +108,50 @@ def transform_order_data(orders):
             logger.warning(f"Expected a dict, but found {type(order)}. Skipping this item.")
             continue
 
+        # Extract price - handle different order types and statuses
+        order_type = order.get("order_type", "").upper()
+        order_status = order.get("status", "").upper()
+        
+        # For MARKET orders, price should be 0
+        if order_type == "MARKET":
+            price = 0.0
+        else:
+            # For LIMIT/SL orders, determine price based on status
+            if order_status == "COMPLETE":
+                # For completed orders, prefer average_price (execution price) over order price
+                price = order.get("average_price") or order.get("price")
+            else:
+                # For open/pending/rejected/cancelled orders, use order price
+                price = order.get("price")
+            
+            # Handle None, empty string, or 0 values
+            if price is None or price == "":
+                price = 0.0
+            else:
+                try:
+                    price = float(price)
+                    # If price is 0 for a LIMIT order, log a warning (might indicate data issue)
+                    if price == 0.0 and order_type in ["LIMIT", "SL", "SL-M"] and order_status not in ["REJECTED", "CANCELLED"]:
+                        logger.debug(f"Zero price detected for {order_type} order {order.get('order_id', 'unknown')} with status {order_status}")
+                except (ValueError, TypeError):
+                    price = 0.0
+        
+        # Extract trigger_price - handle None or empty string
+        trigger_price = order.get("trigger_price")
+        if trigger_price is None or trigger_price == "":
+            trigger_price = 0.0
+        try:
+            trigger_price = float(trigger_price)
+        except (ValueError, TypeError):
+            trigger_price = 0.0
+
         transformed_order = {
             "symbol": order.get("tradingsymbol", ""),
             "exchange": order.get("exchange", ""),
             "action": order.get("transaction_type", ""),
             "quantity": order.get("quantity", 0),
-            "price": order.get("price", 0.0),
-            "trigger_price": order.get("trigger_price", 0.0),
+            "price": price,
+            "trigger_price": trigger_price,
             "pricetype": order.get("order_type", ""),
             "product": order.get("product", ""),
             "orderid": order.get("order_id", ""),

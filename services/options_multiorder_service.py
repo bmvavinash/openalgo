@@ -377,10 +377,25 @@ def place_options_multiorder(
 
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
-            error_response = {
-                'status': 'error',
-                'message': 'Invalid openalgo apikey'
-            }
+            # Log detailed error for debugging
+            logger.error(f"API key validation failed for options multi-order. API key prefix: {api_key[:10] if api_key else 'None'}...")
+            logger.error(f"Request data: underlying={multiorder_data.get('underlying')}, strategy={multiorder_data.get('strategy')}")
+            
+            # Check if API key exists but auth token is missing
+            from database.auth_db import verify_api_key
+            user_id = verify_api_key(api_key)
+            if user_id:
+                logger.error(f"API key is valid for user_id={user_id}, but auth token is missing. User may need to login again.")
+                error_response = {
+                    'status': 'error',
+                    'message': f'API key is valid but broker authentication is missing. Please login to your broker account again.'
+                }
+            else:
+                logger.error(f"API key verification failed. The API key may be invalid or not found in database.")
+                error_response = {
+                    'status': 'error',
+                    'message': 'Invalid openalgo apikey. Please check your API key configuration.'
+                }
             return False, error_response, 403
 
         return process_multiorder_with_auth(multiorder_data, AUTH_TOKEN, broker_name, api_key, original_data)

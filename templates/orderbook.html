@@ -162,8 +162,10 @@
                     <td class="numeric-cell">
                         {% if order.pricetype|upper == 'MARKET' %}
                             0.00
+                        {% elif order.price and order.price != 0 %}
+                            {{ "%.2f"|format(order.price) }}
                         {% else %}
-                            {{ order.price }}
+                            <span class="text-base-content/40">-</span>
                         {% endif %}
                     </td>
                     <td class="numeric-cell">{{ order.trigger_price }}</td>

@@ -152,3 +152,4 @@ All strategies are:
 **Best Strategy**: RSI on BANKNIFTY (76.9% win rate, Rs 1,731.95 profit)
 
 
+

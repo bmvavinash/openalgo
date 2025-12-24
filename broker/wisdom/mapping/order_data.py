@@ -144,13 +144,50 @@ def transform_order_data(orders):
         order_status = order.get("OrderStatus", "")
         mapped_order_status = order_status_mapping.get(order_status, order_status)
 
+        # Extract price - handle different order types and statuses
+        order_type = mapped_order_type.upper() if mapped_order_type else ""
+        order_status = order.get("OrderStatus", "").upper()
+        
+        # For MARKET orders, price should be 0
+        if order_type == "MARKET":
+            price = 0.0
+        else:
+            # For LIMIT/SL orders, determine price based on status
+            if order_status == "FILLED":
+                # For completed orders, prefer AveragePrice (execution price) over OrderPrice
+                price = order.get("AveragePrice") or order.get("OrderPrice")
+            else:
+                # For open/pending/rejected/cancelled orders, use OrderPrice
+                price = order.get("OrderPrice")
+            
+            # Handle None, empty string, or 0 values
+            if price is None or price == "":
+                price = 0.0
+            else:
+                try:
+                    price = float(price)
+                    # If price is 0 for a LIMIT order, log a warning (might indicate data issue)
+                    if price == 0.0 and order_type in ["LIMIT", "SL", "SL-M"] and order_status not in ["REJECTED", "CANCELLED"]:
+                        logger.debug(f"Zero price detected for {order_type} order {order.get('AppOrderID', 'unknown')} with status {order_status}")
+                except (ValueError, TypeError):
+                    price = 0.0
+        
+        # Extract trigger_price - handle None or empty string
+        trigger_price = order.get("OrderStopPrice")
+        if trigger_price is None or trigger_price == "":
+            trigger_price = 0.0
+        try:
+            trigger_price = float(trigger_price)
+        except (ValueError, TypeError):
+            trigger_price = 0.0
+
         transformed_order = {
             "symbol": order.get("TradingSymbol", ""),
             "exchange": mapped_exchange,
             "action": order.get("OrderSide", ""),
             "quantity": order.get("OrderQuantity", 0),
-            "price": order.get("OrderPrice", 0.0),
-            "trigger_price": order.get("OrderStopPrice", 0.0),
+            "price": price,
+            "trigger_price": trigger_price,
             "pricetype": mapped_order_type,
             "product": order.get("ProductType", ""),
             "orderid": str(int(float(order.get("AppOrderID", "")))),

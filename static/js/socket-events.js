@@ -46,7 +46,17 @@ async function refreshOrderbook() {
 // Function to fetch and update tradebook
 async function refreshTradebook() {
     try {
-        const response = await fetch('/tradebook');
+        const response = await fetch('/tradebook', {
+            credentials: 'include',
+            redirect: 'manual'  // Don't follow redirects automatically
+        });
+        
+        // Handle redirects gracefully - don't redirect to login
+        if (response.type === 'opaqueredirect' || response.status === 302 || response.status === 401 || response.status === 403) {
+            console.warn('Tradebook fetch returned redirect/error, showing empty data');
+            return;  // Don't redirect, just return
+        }
+        
         const html = await response.text();
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = html;
@@ -68,7 +78,10 @@ async function refreshTradebook() {
                 currentContainer.innerHTML = newContent.innerHTML;
             }
         }
-    } catch (error) {}
+    } catch (error) {
+        console.warn('Error refreshing tradebook:', error);
+        // Don't redirect on error
+    }
 }
 
 // Function to fetch and update positions

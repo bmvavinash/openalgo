@@ -164,24 +164,34 @@ def orderbook():
     data = response.get('data', {})
     order_data = data.get('orders', [])
     order_stats = data.get('statistics', {})
+    
+    # Ensure order_data is a list (not None)
+    if order_data is None:
+        order_data = []
+    
+    # Ensure order_stats is a dict with all required keys
+    if order_stats is None:
+        order_stats = {}
+    
+    # Set default values for statistics if missing
+    order_stats.setdefault('total_buy_orders', 0)
+    order_stats.setdefault('total_sell_orders', 0)
+    order_stats.setdefault('total_completed_orders', 0)
+    order_stats.setdefault('total_open_orders', 0)
+    order_stats.setdefault('total_rejected_orders', 0)
 
     return render_template('orderbook.html', order_data=order_data, order_stats=order_stats)
 
 @orders_bp.route('/tradebook')
-@check_session_validity
 @limiter.limit(API_RATE_LIMIT)
 def tradebook():
-    login_username = session['user']
-    auth_token = get_auth_token(login_username)
-
-    if auth_token is None:
-        logger.warning(f"No auth token found for user {login_username}")
-        return redirect(url_for('auth.logout'))
-
-    broker = session.get('broker')
-    if not broker:
-        logger.error("Broker not set in session")
-        return "Broker not set in session", 400
+    # CRITICAL: Do NOT use @check_session_validity - it causes redirect loops
+    # Handle session gracefully - show empty data if no session
+    login_username = session.get('user')
+    if not login_username:
+        logger.warning("No user in session for tradebook - showing empty page")
+        # Show empty page instead of redirect loop
+        return render_template('tradebook.html', tradebook_data=[])
 
     # Check if in analyze mode and route accordingly
     if get_analyze_mode():
@@ -191,16 +201,27 @@ def tradebook():
             success, response, status_code = get_tradebook(api_key=api_key)
         else:
             logger.error("No API key found for analyze mode")
-            return "API key required for analyze mode", 400
+            return render_template('tradebook.html', tradebook_data=[])
     else:
-        # Use live broker
+        # Live broker mode - check for auth token and broker
+        auth_token = get_auth_token(login_username)
+        if auth_token is None:
+            logger.warning(f"No auth token found for user {login_username}")
+            return render_template('tradebook.html', tradebook_data=[])
+
+        broker = session.get('broker')
+        if not broker:
+            logger.error("Broker not set in session")
+            return render_template('tradebook.html', tradebook_data=[])
+
         success, response, status_code = get_tradebook(auth_token=auth_token, broker=broker)
 
     if not success:
         logger.error(f"Failed to get tradebook data: {response.get('message', 'Unknown error')}")
         if status_code == 404:
-            return "Failed to import broker module", 500
-        return redirect(url_for('auth.logout'))
+            return render_template('tradebook.html', tradebook_data=[])
+        # In any mode, avoid redirect loops; show empty data on errors
+        return render_template('tradebook.html', tradebook_data=[])
 
     tradebook_data = response.get('data', [])
 

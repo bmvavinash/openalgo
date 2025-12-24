@@ -1,0 +1,133 @@
+====================================================================================================
+COMPREHENSIVE OPTIONS STRATEGY ANALYSIS REPORT
+====================================================================================================
+
+Generated: 2025-12-24 21:05:39
+
+====================================================================================================
+SUMMARY BY PERIOD
+====================================================================================================
+
+
+CURRENT DAY
+----------------------------------------------------------------------------------------------------
+Strategy                       P&L             Scenario             Optimized 
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs       786.00 Profitable           No        
+Buy Straddle                   Rs       465.65 Profitable           Yes       
+Sell Straddle                  Rs       465.65 Profitable           No        
+Bear Put Spread                Rs       175.00 Partial Profit       No        
+Iron Condor                    Rs        51.65 Partial Loss         No        
+Iron Butterfly                 Rs        41.65 Partial Loss         No        
+Bull Call Spread               Rs      -100.00 Max Loss             Yes       
+Buy Strangle                   Rs      -786.00 Loss                 No        
+----------------------------------------------------------------------------------------------------
+Total P&L: Rs     1,099.60
+Profitable Strategies: 6/8
+Win Rate: 75.0%
+
+
+PREVIOUS DAY
+----------------------------------------------------------------------------------------------------
+Strategy                       P&L             Scenario             Optimized 
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs       786.00 Profitable           No        
+Buy Straddle                   Rs       465.65 Profitable           Yes       
+Sell Straddle                  Rs       465.65 Profitable           No        
+Bear Put Spread                Rs       175.00 Partial Profit       No        
+Iron Condor                    Rs        51.65 Partial Loss         No        
+Iron Butterfly                 Rs        41.65 Partial Loss         No        
+Bull Call Spread               Rs      -100.00 Max Loss             Yes       
+Buy Strangle                   Rs      -786.00 Loss                 No        
+----------------------------------------------------------------------------------------------------
+Total P&L: Rs     1,099.60
+Profitable Strategies: 6/8
+Win Rate: 75.0%
+
+
+CURRENT WEEK
+----------------------------------------------------------------------------------------------------
+Strategy                       P&L             Scenario             Optimized 
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs       783.00 Profitable           No        
+Buy Straddle                   Rs       480.35 Profitable           Yes       
+Sell Straddle                  Rs       480.35 Profitable           No        
+Bear Put Spread                Rs       175.00 Partial Profit       No        
+Iron Condor                    Rs        60.00 Max Profit           No        
+Iron Butterfly                 Rs        58.35 Partial Loss         No        
+Bull Call Spread               Rs        -8.35 Partial Profit       Yes       
+Buy Strangle                   Rs      -783.00 Loss                 No        
+----------------------------------------------------------------------------------------------------
+Total P&L: Rs     1,245.70
+Profitable Strategies: 6/8
+Win Rate: 75.0%
+
+
+PREVIOUS WEEK
+----------------------------------------------------------------------------------------------------
+Strategy                       P&L             Scenario             Optimized 
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs       532.35 Loss                 No        
+Bull Call Spread               Rs       175.00 Max Profit           No        
+Buy Straddle                   Rs       174.35 Profitable           Yes       
+Sell Straddle                  Rs       174.35 Profitable           No        
+Iron Condor                    Rs       -40.00 Max Loss             No        
+Iron Butterfly                 Rs      -150.00 Max Loss             No        
+Bear Put Spread                Rs      -175.00 Max Loss             No        
+Buy Strangle                   Rs      -532.35 Profitable           No        
+----------------------------------------------------------------------------------------------------
+Total P&L: Rs       158.70
+Profitable Strategies: 4/8
+Win Rate: 50.0%
+
+
+CURRENT MONTH
+----------------------------------------------------------------------------------------------------
+Strategy                       P&L             Scenario             Optimized 
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs       784.50 Profitable           No        
+Buy Straddle                   Rs       514.65 Profitable           Yes       
+Sell Straddle                  Rs       514.65 Profitable           No        
+Bear Put Spread                Rs       175.00 Partial Profit       No        
+Iron Butterfly                 Rs        91.65 Partial Loss         No        
+Iron Condor                    Rs        60.00 Max Profit           No        
+Bull Call Spread               Rs       -58.35 Partial Profit       Yes       
+Buy Strangle                   Rs      -784.50 Loss                 No        
+----------------------------------------------------------------------------------------------------
+Total P&L: Rs     1,297.60
+Profitable Strategies: 6/8
+Win Rate: 75.0%
+
+
+SIX MONTHS
+----------------------------------------------------------------------------------------------------
+Strategy                       P&L             Scenario             Optimized 
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs       560.95 Loss                 No        
+Buy Straddle                   Rs       202.45 Profitable           Yes       
+Sell Straddle                  Rs       202.45 Profitable           No        
+Bull Call Spread               Rs       175.00 Max Profit           No        
+Iron Condor                    Rs       -40.00 Max Loss             No        
+Iron Butterfly                 Rs      -150.00 Max Loss             No        
+Bear Put Spread                Rs      -175.00 Max Loss             No        
+Buy Strangle                   Rs      -560.95 Profitable           No        
+----------------------------------------------------------------------------------------------------
+Total P&L: Rs       214.90
+Profitable Strategies: 4/8
+Win Rate: 50.0%
+
+
+====================================================================================================
+OVERALL STATISTICS
+====================================================================================================
+
+Strategy                       Total P&L       Avg P&L         Win Rate       
+----------------------------------------------------------------------------------------------------
+Sell Strangle                  Rs     4,232.80 Rs       705.47         100.0%
+Buy Straddle                   Rs     2,303.10 Rs       383.85         100.0%
+Sell Straddle                  Rs     2,303.10 Rs       383.85         100.0%
+Bear Put Spread                Rs       350.00 Rs        58.33          66.7%
+Iron Condor                    Rs       143.30 Rs        23.88          66.7%
+Bull Call Spread               Rs        83.30 Rs        13.88          33.3%
+Iron Butterfly                 Rs       -66.70 Rs       -11.12          66.7%
+Buy Strangle                   Rs    -4,232.80 Rs      -705.47           0.0%

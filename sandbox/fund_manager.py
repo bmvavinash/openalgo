@@ -103,15 +103,15 @@ class FundManager:
             # Check if reset is needed
             self._check_and_reset_funds(funds)
 
-            # Return fund details
+            # Return fund details - format as strings to match broker API format
             return {
-                'availablecash': float(funds.available_balance),
-                'collateral': 0.00,  # No collateral in sandbox
-                'm2munrealized': float(funds.unrealized_pnl),
-                'm2mrealized': float(funds.realized_pnl),
-                'utiliseddebits': float(funds.used_margin),
-                'grossexposure': float(funds.used_margin),
-                'totalpnl': float(funds.total_pnl),
+                'availablecash': f"{float(funds.available_balance):.2f}",
+                'collateral': "0.00",  # No collateral in sandbox
+                'm2munrealized': f"{float(funds.unrealized_pnl):.2f}",
+                'm2mrealized': f"{float(funds.realized_pnl):.2f}",
+                'utiliseddebits': f"{float(funds.used_margin):.2f}",
+                'grossexposure': f"{float(funds.used_margin):.2f}",
+                'totalpnl': f"{float(funds.total_pnl):.2f}",
                 'last_reset': funds.last_reset_date.strftime('%Y-%m-%d %H:%M:%S'),
                 'reset_count': funds.reset_count
             }

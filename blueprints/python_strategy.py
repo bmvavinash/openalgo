@@ -465,27 +465,6 @@ def start_strategy_process(strategy_id):
             if stop_loss_pct is not None:
                 env_vars['STRATEGY_STOP_LOSS_PCT'] = str(stop_loss_pct)
             
-            # Also get API key and host for strategies
-            try:
-                from database.auth_db import get_api_key_for_tradingview
-                strategy_user_id = config.get('user_id')
-                if strategy_user_id:
-                    api_key = get_api_key_for_tradingview(strategy_user_id)
-                    if api_key:
-                        env_vars['OPENALGO_API_KEY'] = api_key
-                
-                # Fallback to .env file if no API key found
-                if 'OPENALGO_API_KEY' not in env_vars:
-                    env_key = os.getenv('OPENALGO_API_KEY')
-                    if env_key:
-                        env_vars['OPENALGO_API_KEY'] = env_key
-            except Exception as e:
-                logger.warning(f"Could not load API key for strategy: {e}")
-                # Fallback to .env file
-                env_key = os.getenv('OPENALGO_API_KEY')
-                if env_key:
-                    env_vars['OPENALGO_API_KEY'] = env_key
-            
             # Get host from config or default
             host = os.getenv('OPENALGO_HOST', 'http://127.0.0.1:5000')
             env_vars['OPENALGO_HOST'] = host
@@ -798,6 +777,143 @@ def unschedule_strategy(strategy_id):
     
     logger.info(f"Unscheduled strategy {strategy_id}")
 
+def get_strategy_performance(strategy_name, days=30):
+    """
+    Calculate strategy performance from sandbox trades
+    Returns: dict with 'pnl', 'pnl_percent', 'total_trades', 'profitability_label'
+    """
+    try:
+        from database.sandbox_db import SandboxTrades, db_session
+        from datetime import datetime, timedelta
+        import pytz
+        from flask import has_request_context, current_app
+        
+        # Ensure we have Flask app context
+        if not has_request_context():
+            if current_app:
+                with current_app.app_context():
+                    return _calculate_performance(strategy_name, days)
+            else:
+                # No app context available, return default
+                logger.warning(f"No Flask context for performance calculation: {strategy_name}")
+                return {
+                    'pnl': 0.0,
+                    'pnl_percent': 0.0,
+                    'total_trades': 0,
+                    'profitability_label': 'unknown',
+                    'buy_value': 0.0,
+                    'sell_value': 0.0
+                }
+        else:
+            return _calculate_performance(strategy_name, days)
+    except Exception as e:
+        logger.error(f"Error calculating performance for {strategy_name}: {e}")
+        return {
+            'pnl': 0.0,
+            'pnl_percent': 0.0,
+            'total_trades': 0,
+            'profitability_label': 'unknown',
+            'buy_value': 0.0,
+            'sell_value': 0.0
+        }
+
+def _calculate_performance(strategy_name, days):
+    """Internal function to calculate performance (assumes Flask context exists)"""
+    try:
+        from database.sandbox_db import SandboxTrades, db_session
+        from datetime import datetime, timedelta
+        import pytz
+        
+        ist = pytz.timezone('Asia/Kolkata')
+        end_date = datetime.now(ist)
+        start_date = end_date - timedelta(days=days)
+        
+        # Query trades for this strategy - try exact match first
+        trades = SandboxTrades.query.filter(
+            SandboxTrades.strategy == strategy_name,
+            SandboxTrades.trade_timestamp >= start_date,
+            SandboxTrades.trade_timestamp <= end_date
+        ).all()
+        
+        # If no exact match, try case-insensitive match
+        if not trades:
+            from sqlalchemy import func
+            trades = SandboxTrades.query.filter(
+                func.lower(SandboxTrades.strategy) == strategy_name.lower(),
+                SandboxTrades.trade_timestamp >= start_date,
+                SandboxTrades.trade_timestamp <= end_date
+            ).all()
+        
+        # For options strategies, also check by symbol type (CE/PE) if strategy name partially matches
+        if not trades and ('Option' in strategy_name or 'option' in strategy_name.lower()):
+            # Get all trades in period and filter by options symbols
+            all_trades = SandboxTrades.query.filter(
+                SandboxTrades.trade_timestamp >= start_date,
+                SandboxTrades.trade_timestamp <= end_date
+            ).all()
+            
+            # Extract base strategy name (e.g., "Option Straddle" -> "Straddle")
+            base_name = strategy_name.replace('Option ', '').replace('option ', '').strip()
+            
+            for trade in all_trades:
+                # Check if symbol is an option (CE/PE)
+                is_option_symbol = trade.symbol and (trade.symbol.endswith('CE') or trade.symbol.endswith('PE'))
+                
+                # Match if strategy name contains base name or vice versa
+                trade_strategy = (trade.strategy or '').lower()
+                if is_option_symbol and (base_name.lower() in trade_strategy or trade_strategy in base_name.lower()):
+                    trades.append(trade)
+        
+        if not trades:
+            return {
+                'pnl': 0.0,
+                'pnl_percent': 0.0,
+                'total_trades': 0,
+                'profitability_label': 'unknown',
+                'buy_value': 0.0,
+                'sell_value': 0.0
+            }
+        
+        buy_value = 0.0
+        sell_value = 0.0
+        
+        for trade in trades:
+            value = float(trade.price) * trade.quantity
+            if trade.action == 'BUY':
+                buy_value += value
+            else:  # SELL
+                sell_value += value
+        
+        pnl = sell_value - buy_value
+        pnl_percent = (pnl / buy_value * 100) if buy_value > 0 else 0.0
+        
+        # Determine profitability label
+        if pnl > 0:
+            profitability_label = 'profitable'
+        elif pnl < 0:
+            profitability_label = 'losing'
+        else:
+            profitability_label = 'neutral'
+        
+        return {
+            'pnl': round(pnl, 2),
+            'pnl_percent': round(pnl_percent, 2),
+            'total_trades': len(trades),
+            'profitability_label': profitability_label,
+            'buy_value': buy_value,
+            'sell_value': sell_value
+        }
+    except Exception as e:
+        logger.error(f"Error in _calculate_performance for {strategy_name}: {e}")
+        return {
+            'pnl': 0.0,
+            'pnl_percent': 0.0,
+            'total_trades': 0,
+            'profitability_label': 'unknown',
+            'buy_value': 0.0,
+            'sell_value': 0.0
+        }
+
 @python_strategy_bp.route('/')
 @check_session_validity
 def index():
@@ -815,25 +931,14 @@ def index():
                 config['pid'] = None
                 save_configs()
         
-        # Calculate profitability label
-        total_pnl = config.get('total_pnl', 0.0)
-        win_rate = config.get('win_rate', 0.0)
-        total_trades = config.get('total_trades', 0)
+        strategy_name = config.get('name', 'Unnamed')
         
-        profitability_label = 'unknown'
-        if total_trades > 0:
-            if total_pnl > 10000 and win_rate >= 70:
-                profitability_label = 'high_profit'
-            elif total_pnl > 0 and win_rate >= 50:
-                profitability_label = 'medium_profit'
-            elif total_pnl > 0:
-                profitability_label = 'low_profit'
-            else:
-                profitability_label = 'losses'
+        # Get performance data
+        performance = get_strategy_performance(strategy_name, days=30)
         
         strategy_info = {
             'id': sid,
-            'name': config.get('name', 'Unnamed'),
+            'name': strategy_name,
             'file': Path(config.get('file_path', '')).name,
             'is_running': config.get('is_running', False),
             'is_scheduled': config.get('is_scheduled', False),
@@ -849,12 +954,7 @@ def index():
             'pid': config.get('pid'),
             'params': {},  # No params needed in simplified version
             'strategy_type': config.get('strategy_type', 'intraday'),  # 'intraday' or 'options'
-            'profitability_label': profitability_label,  # 'high_profit', 'medium_profit', 'low_profit', 'losses', 'unknown'
-            'total_pnl': total_pnl,
-            'win_rate': win_rate,
-            'total_trades': total_trades,
-            'winning_trades': config.get('winning_trades', 0),
-            'losing_trades': config.get('losing_trades', 0)
+            'performance': performance  # Add performance data
         }
         
         # Add runtime info if running
@@ -941,9 +1041,6 @@ def new_strategy():
             else:
                 stop_loss_pct = None
             
-            # Detect strategy type from filename/content
-            strategy_type = 'options' if 'option' in filename.lower() else 'intraday'
-            
             # Save configuration
             STRATEGY_CONFIGS[strategy_id] = {
                 'name': strategy_name,
@@ -953,15 +1050,7 @@ def new_strategy():
                 'created_at': ist_now.isoformat(),
                 'user_id': user_id,
                 'scalping_enabled': scalping_enabled,
-                'stop_loss_pct': stop_loss_pct,
-                'strategy_type': strategy_type,  # 'intraday' or 'options'
-                'profitability_label': 'unknown',  # Will be updated based on live performance
-                'total_pnl': 0.0,
-                'win_rate': 0.0,
-                'total_trades': 0,
-                'winning_trades': 0,
-                'losing_trades': 0,
-                'last_pnl_update': None
+                'stop_loss_pct': stop_loss_pct
             }
             save_configs()
             
@@ -1331,6 +1420,378 @@ def check_contracts():
             'message': f'Error checking contracts: {str(e)}'
         }), 500
 
+@python_strategy_bp.route('/start-all', methods=['POST'])
+@check_session_validity
+def start_all_strategies():
+    """Start all strategies that are not currently running"""
+    user_id = session.get('user')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Session expired'}), 401
+    
+    try:
+        started_count = 0
+        failed_count = 0
+        skipped_count = 0
+        messages = []
+        
+        # Ensure initialization is done
+        initialize_with_app_context()
+        
+        # Check analyze mode before starting
+        try:
+            from database.settings_db import get_analyze_mode
+            analyze_mode = get_analyze_mode()
+            logger.info(f"Starting all strategies - Analysis mode: {analyze_mode}")
+        except Exception as e:
+            logger.warning(f"Could not check analyze mode: {e}")
+        
+        # Iterate through all strategies
+        for strategy_id, config in STRATEGY_CONFIGS.items():
+            # Verify ownership
+            is_owner, _ = verify_strategy_ownership(strategy_id, user_id)
+            if not is_owner:
+                continue
+            
+            # Skip if already running
+            if config.get('is_running', False) or strategy_id in RUNNING_STRATEGIES:
+                skipped_count += 1
+                continue
+            
+            # Try to start the strategy
+            success, message = start_strategy_process(strategy_id)
+            if success:
+                started_count += 1
+                messages.append(f"{config.get('name', strategy_id)}: {message}")
+            else:
+                failed_count += 1
+                messages.append(f"{config.get('name', strategy_id)}: {message}")
+        
+        if started_count > 0:
+            logger.info(f"Started {started_count} strategies, {failed_count} failed, {skipped_count} skipped")
+            return jsonify({
+                'success': True,
+                'message': f'Started {started_count} strategy(ies), {failed_count} failed, {skipped_count} skipped',
+                'started_count': started_count,
+                'failed_count': failed_count,
+                'skipped_count': skipped_count,
+                'details': messages
+            })
+        elif skipped_count > 0:
+            return jsonify({
+                'success': True,
+                'message': f'All strategies are already running ({skipped_count} skipped)',
+                'started_count': 0,
+                'failed_count': failed_count,
+                'skipped_count': skipped_count,
+                'details': messages
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Failed to start any strategies. {failed_count} failed.',
+                'started_count': 0,
+                'failed_count': failed_count,
+                'skipped_count': skipped_count,
+                'details': messages
+            })
+    except Exception as e:
+        logger.error(f"Error starting all strategies: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error starting all strategies: {str(e)}'
+        }), 500
+
+@python_strategy_bp.route('/stop-all', methods=['POST'])
+@check_session_validity
+def stop_all_strategies():
+    """Stop all strategies that are currently running"""
+    user_id = session.get('user')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Session expired'}), 401
+    
+    try:
+        stopped_count = 0
+        failed_count = 0
+        skipped_count = 0
+        messages = []
+        
+        # Iterate through all strategies
+        for strategy_id, config in STRATEGY_CONFIGS.items():
+            # Verify ownership
+            is_owner, _ = verify_strategy_ownership(strategy_id, user_id)
+            if not is_owner:
+                continue
+            
+            # Skip if not running
+            if not config.get('is_running', False) and strategy_id not in RUNNING_STRATEGIES:
+                skipped_count += 1
+                continue
+            
+            # Try to stop the strategy
+            success, message = stop_strategy_process(strategy_id)
+            if success:
+                stopped_count += 1
+                messages.append(f"{config.get('name', strategy_id)}: {message}")
+            else:
+                failed_count += 1
+                messages.append(f"{config.get('name', strategy_id)}: {message}")
+        
+        if stopped_count > 0:
+            logger.info(f"Stopped {stopped_count} strategies, {failed_count} failed, {skipped_count} skipped")
+            return jsonify({
+                'success': True,
+                'message': f'Stopped {stopped_count} strategy(ies), {failed_count} failed, {skipped_count} skipped',
+                'stopped_count': stopped_count,
+                'failed_count': failed_count,
+                'skipped_count': skipped_count,
+                'details': messages
+            })
+        elif skipped_count > 0:
+            return jsonify({
+                'success': True,
+                'message': f'No strategies are currently running ({skipped_count} skipped)',
+                'stopped_count': 0,
+                'failed_count': failed_count,
+                'skipped_count': skipped_count,
+                'details': messages
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Failed to stop any strategies. {failed_count} failed.',
+                'stopped_count': 0,
+                'failed_count': failed_count,
+                'skipped_count': skipped_count,
+                'details': messages
+            })
+    except Exception as e:
+        logger.error(f"Error stopping all strategies: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error stopping all strategies: {str(e)}'
+        }), 500
+
+@python_strategy_bp.route('/restart-all', methods=['POST'])
+@check_session_validity
+def restart_all_strategies():
+    """Restart all strategies - stop all, then start all"""
+    user_id = session.get('user')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Session expired'}), 401
+    
+    try:
+        import time
+        
+        # First stop all running strategies
+        stopped_count = 0
+        failed_stop_count = 0
+        stop_messages = []
+        
+        for strategy_id, config in STRATEGY_CONFIGS.items():
+            is_owner, _ = verify_strategy_ownership(strategy_id, user_id)
+            if not is_owner:
+                continue
+            
+            if config.get('is_running', False) or strategy_id in RUNNING_STRATEGIES:
+                success, message = stop_strategy_process(strategy_id)
+                if success:
+                    stopped_count += 1
+                    stop_messages.append(f"{config.get('name', strategy_id)}: {message}")
+                else:
+                    failed_stop_count += 1
+                    stop_messages.append(f"{config.get('name', strategy_id)}: {message}")
+        
+        # Wait a moment for processes to terminate
+        time.sleep(2)
+        
+        # Ensure initialization is done
+        initialize_with_app_context()
+        
+        # Then start all strategies
+        started_count = 0
+        failed_start_count = 0
+        start_messages = []
+        
+        for strategy_id, config in STRATEGY_CONFIGS.items():
+            is_owner, _ = verify_strategy_ownership(strategy_id, user_id)
+            if not is_owner:
+                continue
+            
+            # Skip if still running (shouldn't happen, but check anyway)
+            if config.get('is_running', False) or strategy_id in RUNNING_STRATEGIES:
+                continue
+            
+            success, message = start_strategy_process(strategy_id)
+            if success:
+                started_count += 1
+                start_messages.append(f"{config.get('name', strategy_id)}: {message}")
+            else:
+                failed_start_count += 1
+                start_messages.append(f"{config.get('name', strategy_id)}: {message}")
+        
+        logger.info(f"Restarted all strategies: stopped {stopped_count}, started {started_count}, failed stop {failed_stop_count}, failed start {failed_start_count}")
+        return jsonify({
+            'success': True,
+            'message': f'Restarted all strategies: stopped {stopped_count}, started {started_count}, {failed_stop_count + failed_start_count} failed',
+            'stopped_count': stopped_count,
+            'started_count': started_count,
+            'failed_stop_count': failed_stop_count,
+            'failed_start_count': failed_start_count,
+            'stop_details': stop_messages,
+            'start_details': start_messages
+        })
+    except Exception as e:
+        logger.error(f"Error restarting all strategies: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error restarting all strategies: {str(e)}'
+        }), 500
+
+@python_strategy_bp.route('/backtest-analysis', methods=['GET'])
+@check_session_validity
+def backtest_analysis():
+    """Run backtest analysis and return results"""
+    try:
+        from database.sandbox_db import SandboxTrades, db_session
+        from datetime import datetime, timedelta
+        import pytz
+        from collections import defaultdict
+        
+        ist = pytz.timezone('Asia/Kolkata')
+        today = datetime.now(ist).date()
+        yesterday = today - timedelta(days=1)
+        week_start = today - timedelta(days=7)
+        month_start = today - timedelta(days=30)
+        days_7_start = today - timedelta(days=7)
+        days_14_start = today - timedelta(days=14)
+        
+        periods = [
+            ("CURRENT DAY", today, today),
+            ("PREVIOUS DAY", yesterday, yesterday),
+            ("LAST 7 DAYS", days_7_start, today),
+            ("LAST 14 DAYS", days_14_start, today),
+            ("PREVIOUS WEEK", week_start, today),
+            ("CURRENT MONTH", month_start, today)
+        ]
+        
+        all_results = {}
+        
+        for period_name, start_date, end_date in periods:
+            start_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=ist)
+            end_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=ist)
+            
+            trades = SandboxTrades.query.filter(
+                SandboxTrades.trade_timestamp >= start_dt,
+                SandboxTrades.trade_timestamp <= end_dt
+            ).all()
+            
+            strategy_stats = defaultdict(lambda: {
+                'trades': 0, 'buy_value': 0, 'sell_value': 0, 'pnl': 0, 
+                'buy_count': 0, 'sell_count': 0, 'symbols': set()
+            })
+            
+            for trade in trades:
+                strategy = trade.strategy or 'Unknown'
+                value = float(trade.price) * trade.quantity
+                strategy_stats[strategy]['symbols'].add(trade.symbol)
+                
+                if trade.action == 'BUY':
+                    strategy_stats[strategy]['trades'] += 1
+                    strategy_stats[strategy]['buy_value'] += value
+                    strategy_stats[strategy]['buy_count'] += 1
+                else:  # SELL
+                    strategy_stats[strategy]['trades'] += 1
+                    strategy_stats[strategy]['sell_value'] += value
+                    strategy_stats[strategy]['sell_count'] += 1
+            
+            # Calculate PnL
+            for strategy, stats in strategy_stats.items():
+                stats['pnl'] = stats['sell_value'] - stats['buy_value']
+                stats['pnl_percent'] = (stats['pnl'] / stats['buy_value'] * 100) if stats['buy_value'] > 0 else 0
+                stats['symbols'] = list(stats['symbols'])
+            
+            profitable = []
+            losing = []
+            
+            for strategy, data in strategy_stats.items():
+                # Determine strategy type
+                strategy_type = 'INTRADAY'
+                if 'Option' in strategy or 'option' in strategy.lower():
+                    strategy_type = 'OPTIONS'
+                elif data['symbols']:
+                    # Check if any symbol is an option
+                    for sym in data['symbols']:
+                        if sym and (sym.endswith('CE') or sym.endswith('PE')):
+                            strategy_type = 'OPTIONS'
+                            break
+                
+                if data['pnl'] > 0:
+                    profitable.append({
+                        'strategy': strategy,
+                        'type': strategy_type,
+                        'pnl': round(data['pnl'], 2),
+                        'pnl_percent': round(data['pnl_percent'], 2),
+                        'trades': data['trades']
+                    })
+                else:
+                    losing.append({
+                        'strategy': strategy,
+                        'type': strategy_type,
+                        'pnl': round(data['pnl'], 2),
+                        'pnl_percent': round(data['pnl_percent'], 2),
+                        'trades': data['trades']
+                    })
+            
+            all_results[period_name] = {
+                'profitable': profitable,
+                'losing': losing,
+                'total_strategies': len(strategy_stats),
+                'total_trades': sum(s['trades'] for s in strategy_stats.values())
+            }
+        
+        # Calculate overall summary
+        overall_profitable = set()
+        overall_losing = set()
+        options_profitable = set()
+        options_losing = set()
+        intraday_profitable = set()
+        intraday_losing = set()
+        
+        for period_name, results in all_results.items():
+            for item in results['profitable']:
+                overall_profitable.add(item['strategy'])
+                if item['type'] == 'OPTIONS':
+                    options_profitable.add(item['strategy'])
+                else:
+                    intraday_profitable.add(item['strategy'])
+            for item in results['losing']:
+                overall_losing.add(item['strategy'])
+                if item['type'] == 'OPTIONS':
+                    options_losing.add(item['strategy'])
+                else:
+                    intraday_losing.add(item['strategy'])
+        
+        return jsonify({
+            'success': True,
+            'results': all_results,
+            'summary': {
+                'overall_profitable': sorted(list(overall_profitable)),
+                'overall_losing': sorted(list(overall_losing)),
+                'options_profitable': sorted(list(options_profitable)),
+                'options_losing': sorted(list(options_losing)),
+                'intraday_profitable': sorted(list(intraday_profitable)),
+                'intraday_losing': sorted(list(intraday_losing))
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error running backtest analysis: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'message': f'Error running analysis: {str(e)}'
+        }), 500
+
 @python_strategy_bp.route('/edit/<strategy_id>')
 @check_session_validity
 def edit_strategy(strategy_id):
@@ -1482,111 +1943,6 @@ def save_strategy(strategy_id):
     except Exception as e:
         logger.error(f"Failed to save strategy {strategy_id}: {e}")
         return jsonify({'success': False, 'message': f'Failed to save: {str(e)}'}), 500
-
-@python_strategy_bp.route('/performance/<strategy_id>')
-@check_session_validity
-def get_strategy_performance(strategy_id):
-    """Get performance data for a strategy"""
-    user_id = session.get('user')
-    if not user_id:
-        return jsonify({'success': False, 'message': 'Session expired'}), 401
-    
-    is_owner, error_response = verify_strategy_ownership(strategy_id, user_id)
-    if not is_owner:
-        return error_response
-    
-    try:
-        from services.strategy_performance_tracker import get_strategy_performance
-        perf_data = get_strategy_performance(strategy_id)
-        
-        if perf_data:
-            return jsonify({
-                'success': True,
-                'performance': perf_data
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'performance': {
-                    'total_pnl': 0.0,
-                    'total_trades': 0,
-                    'win_rate': 0.0,
-                    'strategy_type': STRATEGY_CONFIGS.get(strategy_id, {}).get('strategy_type', 'intraday')
-                }
-            })
-    except Exception as e:
-        logger.error(f"Error getting performance: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@python_strategy_bp.route('/performance/daily')
-@check_session_validity
-def get_daily_performance():
-    """Get daily performance summary"""
-    try:
-        from services.strategy_performance_tracker import get_daily_summary
-        summary = get_daily_summary()
-        return jsonify({'success': True, 'summary': summary})
-    except Exception as e:
-        logger.error(f"Error getting daily performance: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@python_strategy_bp.route('/performance/update', methods=['POST'])
-@check_session_validity
-def update_performance():
-    """Update strategy performance (called from strategies)"""
-    try:
-        data = request.get_json()
-        strategy_id = data.get('strategy_id')
-        pnl = data.get('pnl', 0.0)
-        is_win = data.get('is_win', False)
-        strategy_type = data.get('strategy_type', 'intraday')
-        
-        if not strategy_id:
-            return jsonify({'success': False, 'message': 'strategy_id required'}), 400
-        
-        from services.strategy_performance_tracker import update_strategy_performance
-        update_strategy_performance(strategy_id, pnl, is_win, strategy_type)
-        
-        return jsonify({'success': True, 'message': 'Performance updated'})
-    except Exception as e:
-        logger.error(f"Error updating performance: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@python_strategy_bp.route('/analysis/daily')
-@check_session_validity
-def get_daily_analysis():
-    """Get daily performance analysis"""
-    try:
-        from services.live_market_analyzer import analyze_daily_performance
-        analysis = analyze_daily_performance()
-        return jsonify({'success': True, 'analysis': analysis})
-    except Exception as e:
-        logger.error(f"Error getting daily analysis: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@python_strategy_bp.route('/analysis/recommended')
-@check_session_validity
-def get_recommended_strategies():
-    """Get recommended strategies for live trading"""
-    try:
-        from services.live_market_analyzer import get_recommended_strategies
-        recommended = get_recommended_strategies()
-        return jsonify({'success': True, 'recommended': recommended})
-    except Exception as e:
-        logger.error(f"Error getting recommended strategies: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-@python_strategy_bp.route('/analysis/report')
-@check_session_validity
-def get_end_of_day_report():
-    """Get end-of-day performance report"""
-    try:
-        from services.live_market_analyzer import generate_end_of_day_report
-        report = generate_end_of_day_report()
-        return jsonify({'success': True, 'report': report})
-    except Exception as e:
-        logger.error(f"Error generating report: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
 
 @python_strategy_bp.route('/env/<strategy_id>', methods=['GET', 'POST'])
 @check_session_validity

@@ -89,3 +89,4 @@ def get_nse_data(symbol: str, exchange: str = 'NSE', interval: str = '5m',
         return pd.DataFrame()
 
 
+

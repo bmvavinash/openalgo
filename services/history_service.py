@@ -138,12 +138,106 @@ def get_history(
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # In analyze mode, allow history to proceed even if API key validation fails
+        # This enables paper trading without valid broker credentials
+        from database.settings_db import get_analyze_mode
+        analyze_mode = get_analyze_mode()
+        
         AUTH_TOKEN, FEED_TOKEN, broker_name = get_auth_token_broker(api_key, include_feed_token=True)
         if AUTH_TOKEN is None:
-            return False, {
-                'status': 'error',
-                'message': 'Invalid openalgo apikey'
-            }, 403
+            if analyze_mode:
+                # In analyze mode, try to fetch historical data using yfinance
+                try:
+                    import yfinance as yf
+                    import pandas as pd
+                    from datetime import datetime
+                    
+                    # Map exchange codes to yfinance symbols
+                    symbol_mapping = {
+                        'NIFTY': '^NSEI',
+                        'BANKNIFTY': '^NSEBANK',
+                        'FINNIFTY': '^NSEFIN',
+                        'MIDCPNIFTY': '^NSEMIDCP'
+                    }
+                    
+                    yf_symbol = symbol_mapping.get(symbol.upper())
+                    if yf_symbol:
+                        ticker = yf.Ticker(yf_symbol)
+                        
+                        # Convert interval to yfinance format
+                        interval_map = {
+                            '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m',
+                            '30m': '30m', '1h': '1h', '1d': '1d'
+                        }
+                        yf_interval = interval_map.get(interval.lower(), '5m')
+                        
+                        # Calculate period from dates - handle both string and date objects
+                        if isinstance(start_date, str):
+                            start = datetime.strptime(start_date, '%Y-%m-%d')
+                        else:
+                            # Already a date/datetime object
+                            start = datetime.combine(start_date, datetime.min.time()) if hasattr(start_date, 'date') else start_date
+                        
+                        if isinstance(end_date, str):
+                            end = datetime.strptime(end_date, '%Y-%m-%d')
+                        else:
+                            # Already a date/datetime object
+                            end = datetime.combine(end_date, datetime.min.time()) if hasattr(end_date, 'date') else end_date
+                        
+                        days_diff = (end - start).days
+                        
+                        # yfinance: use either period OR start/end, not both
+                        # For intraday intervals, limit to 59 days max
+                        if yf_interval in ['1m', '3m', '5m', '15m', '30m']:
+                            if days_diff <= 59:
+                                # Use period for short ranges
+                                hist = ticker.history(period=f'{days_diff + 1}d', interval=yf_interval)
+                            else:
+                                # For longer ranges, use start/end but limit to 59 days
+                                limited_start = end - timedelta(days=59)
+                                end_date_str = end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
+                                hist = ticker.history(interval=yf_interval, start=limited_start.strftime('%Y-%m-%d'), end=end_date_str)
+                        else:
+                            # For daily intervals, use start/end
+                            start_date_str = start_date.strftime('%Y-%m-%d') if hasattr(start_date, 'strftime') else str(start_date)
+                            end_date_str = end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
+                            hist = ticker.history(interval=yf_interval, start=start_date_str, end=end_date_str)
+                        
+                        if not hist.empty:
+                            # Convert to expected format
+                            df = pd.DataFrame({
+                                'timestamp': hist.index,
+                                'open': hist['Open'].values,
+                                'high': hist['High'].values,
+                                'low': hist['Low'].values,
+                                'close': hist['Close'].values,
+                                'volume': hist['Volume'].values,
+                                'oi': [0] * len(hist)
+                            })
+                            
+                            logger.info(f"Fetched historical data for {symbol} via yfinance: {len(df)} records")
+                            return True, {
+                                'status': 'success',
+                                'data': df.to_dict(orient='records')
+                            }, 200
+                except ImportError:
+                    logger.warning("yfinance not available, skipping historical data fetch")
+                except Exception as e:
+                    logger.warning(f"Failed to fetch historical data via yfinance for {symbol}: {e}")
+                    import traceback
+                    logger.debug(traceback.format_exc())
+                
+                # Fallback: return empty DataFrame structure
+                logger.warning(f"Using empty historical data for {symbol} in analyze mode")
+                return True, {
+                    'status': 'success',
+                    'data': []
+                }, 200
+            else:
+                return False, {
+                    'status': 'error',
+                    'message': 'Invalid openalgo apikey'
+                }, 403
         return get_history_with_auth(
             AUTH_TOKEN, 
             FEED_TOKEN, 

@@ -117,13 +117,50 @@ def transform_order_data(orders):
             logger.warning(f"Warning: Expected a dict, but found a {type(order)}. Skipping this item.")
             continue
 
+        # Extract price - handle different order types and statuses
+        order_type = order.get("prctyp", "").upper()
+        order_status = order.get("status", "").upper()
+        
+        # For MARKET orders, price should be 0
+        if order_type == "MARKET":
+            price = 0.0
+        else:
+            # For LIMIT/SL orders, determine price based on status
+            if order_status in ["COMPLETE", "FILLED"]:
+                # For completed orders, prefer avgprc (execution price) over prc
+                price = order.get("avgprc") or order.get("prc")
+            else:
+                # For open/pending/rejected/cancelled orders, use prc
+                price = order.get("prc")
+            
+            # Handle None, empty string, or 0 values
+            if price is None or price == "":
+                price = 0.0
+            else:
+                try:
+                    price = float(price)
+                    # If price is 0 for a LIMIT order, log a warning (might indicate data issue)
+                    if price == 0.0 and order_type in ["LIMIT", "SL", "SL-M"] and order_status not in ["REJECTED", "CANCELLED"]:
+                        logger.debug(f"Zero price detected for {order_type} order {order.get('norenordno', 'unknown')} with status {order_status}")
+                except (ValueError, TypeError):
+                    price = 0.0
+        
+        # Extract trigger_price - handle None or empty string
+        trigger_price = order.get("trgprc")
+        if trigger_price is None or trigger_price == "":
+            trigger_price = 0.0
+        try:
+            trigger_price = float(trigger_price)
+        except (ValueError, TypeError):
+            trigger_price = 0.0
+
         transformed_order = {
             "symbol": order.get("tsym", ""),
             "exchange": order.get("exch", ""),
             "action": order.get("trantype", ""),
             "quantity": order.get("qty", 0),
-            "price": order.get("prc", 0.0),
-            "trigger_price": order.get("trgprc", 0.0),
+            "price": price,
+            "trigger_price": trigger_price,
             "pricetype": order.get("prctyp", ""),
             "product": order.get("prd", ""),
             "orderid": order.get("norenordno", ""),

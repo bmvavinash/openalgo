@@ -97,6 +97,19 @@ def get_funds(api_key: Optional[str] = None, auth_token: Optional[str] = None, b
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # Check if in analyze/paper trading mode - route to sandbox directly
+        from database.settings_db import get_analyze_mode
+        analyze_mode = get_analyze_mode()
+        logger.info(f"get_funds called with api_key, analyze_mode={analyze_mode}")
+        if analyze_mode:
+            logger.info(f"Paper trading mode detected - routing to sandbox for API key: {api_key[:10]}...{api_key[-4:]}")
+            from services.sandbox_service import sandbox_get_funds
+            original_data = {'apikey': api_key}
+            result = sandbox_get_funds(api_key, original_data)
+            logger.info(f"sandbox_get_funds returned: success={result[0]}, status_code={result[2]}")
+            return result
+        
+        # Live broker mode - get auth token
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
             return False, {

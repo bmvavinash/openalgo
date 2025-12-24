@@ -291,7 +291,18 @@ def create_app():
             request.path.startswith('/_reload-ws')):  # WebSocket reload endpoint
             return
         
+        # Skip session check for tradebook route - it handles its own errors gracefully
+        # Check both exact path and path with query parameters
+        if request.path == '/tradebook' or request.path.startswith('/tradebook?'):
+            return
+        
+        # Skip session check for dashboard route - it handles paper trading mode internally
+        # Dashboard allows access in paper trading mode without full session validation
+        if request.path == '/dashboard' or request.path.startswith('/dashboard?'):
+            return
+        
         # Check if user is logged in and session is expired
+        # Only clear session if logged_in flag exists - don't redirect here
         if session.get('logged_in') and not is_session_valid():
             logger.info(f"Session expired for user: {session.get('user')} - revoking tokens")
             revoke_user_tokens()

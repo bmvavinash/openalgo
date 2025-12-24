@@ -74,7 +74,15 @@ class ExecutionEngine:
                 batch = symbols_list[i:i + self.api_rate_limit]
 
                 for symbol, exchange in batch:
-                    quote_cache[(symbol, exchange)] = self._fetch_quote(symbol, exchange)
+                    # Get fallback price from first order for this symbol (use stored price)
+                    fallback_price = None
+                    if orders_by_symbol[(symbol, exchange)]:
+                        first_order = orders_by_symbol[(symbol, exchange)][0]
+                        # Use stored price as fallback (for MARKET orders, this is the LTP used for margin)
+                        if first_order.price:
+                            fallback_price = float(first_order.price)
+                    
+                    quote_cache[(symbol, exchange)] = self._fetch_quote(symbol, exchange, fallback_price)
 
                 # Wait 1 second before next batch if more symbols remain
                 if i + self.api_rate_limit < len(symbols_list):
@@ -87,9 +95,15 @@ class ExecutionEngine:
 
                 for order in batch:
                     quote = quote_cache.get((order.symbol, order.exchange))
+                    # If quote is None, try to get fallback from order's stored price
+                    if not quote and order.price:
+                        fallback_price = float(order.price)
+                        quote = self._fetch_quote(order.symbol, order.exchange, fallback_price)
                     if quote:
                         self._process_order(order, quote)
                         orders_processed += 1
+                    else:
+                        logger.warning(f"Could not get quote for order {order.orderid}: {order.symbol} on {order.exchange}")
 
                 # Wait 1 second before next batch if more orders remain
                 if i + self.order_rate_limit < len(pending_orders):
@@ -100,11 +114,11 @@ class ExecutionEngine:
         except Exception as e:
             logger.error(f"Error in execution engine: {e}")
 
-    def _fetch_quote(self, symbol, exchange):
+    def _fetch_quote(self, symbol, exchange, fallback_price=None):
         """
         Fetch real-time quote for a symbol using API key
         Returns dict with ltp, high, low, open, close, etc.
-        Returns None if quote cannot be fetched (permission error, API error, etc.)
+        If quote cannot be fetched, returns a fallback quote using fallback_price or order's stored price
         """
         try:
             # Get any user's API key for fetching quotes
@@ -113,6 +127,10 @@ class ExecutionEngine:
 
             if not api_key_obj:
                 logger.debug("No API keys found for fetching quotes")
+                # Return fallback quote if available
+                if fallback_price:
+                    logger.info(f"Using fallback price {fallback_price} for {symbol} (no API key)")
+                    return {'ltp': fallback_price, 'bid': fallback_price, 'ask': fallback_price}
                 return None
 
             # Decrypt the API key
@@ -132,11 +150,19 @@ class ExecutionEngine:
             else:
                 # Log at debug level to avoid spam for permission errors
                 logger.debug(f"Could not fetch quote for {symbol}: {response.get('message', 'Unknown error')}")
+                # Return fallback quote if available
+                if fallback_price:
+                    logger.info(f"Using fallback price {fallback_price} for {symbol} (quote fetch failed)")
+                    return {'ltp': fallback_price, 'bid': fallback_price, 'ask': fallback_price}
                 return None
 
         except Exception as e:
             # Handle all exceptions gracefully - don't stop execution engine
             logger.debug(f"Exception fetching quote for {symbol}: {str(e)}")
+            # Return fallback quote if available
+            if fallback_price:
+                logger.info(f"Using fallback price {fallback_price} for {symbol} (exception: {str(e)})")
+                return {'ltp': fallback_price, 'bid': fallback_price, 'ask': fallback_price}
             return None
 
     def _process_order(self, order, quote):

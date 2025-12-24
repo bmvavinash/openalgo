@@ -1140,3 +1140,4 @@ STRATEGY_BACKTESTS = {
     "Covered Call": backtest_covered_call,
     "Calendar Spread": backtest_calendar_spread,
 }
+

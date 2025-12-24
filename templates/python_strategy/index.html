@@ -10,54 +10,33 @@
             <h1 class="text-3xl font-bold">Python Strategies</h1>
             <p class="text-base-content/70 mt-2">Manage and schedule your trading strategies</p>
         </div>
-        <a href="{{ url_for('python_strategy_bp.new_strategy') }}" class="btn btn-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Strategy
-        </a>
-    </div>
-
-    <!-- Filters -->
-    <div class="card bg-base-200 shadow-md mb-6">
-        <div class="card-body p-4">
-            <div class="flex flex-wrap gap-4 items-center">
-                <div class="form-control">
-                    <label class="label cursor-pointer gap-2">
-                        <span class="label-text">Filter by Type:</span>
-                        <select id="filter_type" class="select select-bordered select-sm" onchange="filterStrategies()">
-                            <option value="all">All Types</option>
-                            <option value="intraday">Intraday</option>
-                            <option value="options">Options</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="form-control">
-                    <label class="label cursor-pointer gap-2">
-                        <span class="label-text">Filter by Profitability:</span>
-                        <select id="filter_profitability" class="select select-bordered select-sm" onchange="filterStrategies()">
-                            <option value="all">All</option>
-                            <option value="high_profit">High Profit</option>
-                            <option value="medium_profit">Medium Profit</option>
-                            <option value="low_profit">Low Profit</option>
-                            <option value="losses">Losses</option>
-                            <option value="unknown">Unknown</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="form-control">
-                    <label class="label cursor-pointer gap-2">
-                        <span class="label-text">Sort by:</span>
-                        <select id="sort_by" class="select select-bordered select-sm" onchange="filterStrategies()">
-                            <option value="name">Name</option>
-                            <option value="pnl">Total PnL</option>
-                            <option value="win_rate">Win Rate</option>
-                            <option value="type">Type</option>
-                        </select>
-                    </label>
-                </div>
-                <button onclick="resetFilters()" class="btn btn-sm btn-ghost">Reset</button>
-            </div>
+        <div class="flex gap-2">
+            <button onclick="startAllStrategies()" class="btn btn-success" id="start-all-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Start All
+            </button>
+            <button onclick="stopAllStrategies()" class="btn btn-error" id="stop-all-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6m-6 4h6" />
+                </svg>
+                Stop All
+            </button>
+            <button onclick="restartAllStrategies()" class="btn btn-warning" id="restart-all-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Restart All
+            </button>
+            <a href="{{ url_for('python_strategy_bp.new_strategy') }}" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Strategy
+            </a>
         </div>
     </div>
 
@@ -121,42 +100,14 @@
 
     <!-- Strategy Cards -->
     {% if strategies %}
-    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" id="strategies_grid">
+    <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {% for strategy in strategies %}
-        <div class="card bg-base-100 shadow-xl strategy-card" 
-             data-strategy-type="{{ strategy.strategy_type|default('intraday') }}"
-             data-profitability="{{ strategy.profitability_label|default('unknown') }}"
-             data-pnl="{{ strategy.total_pnl|default(0) }}"
-             data-win-rate="{{ strategy.win_rate|default(0) }}"
-             data-name="{{ strategy.name|lower }}">
+        <div class="card bg-base-100 shadow-xl">
             <div class="card-body">
                 <!-- Header with Status -->
                 <div class="flex justify-between items-start">
                     <h2 class="card-title">{{ strategy.name }}</h2>
-                    <div class="flex gap-2 flex-wrap">
-                        <!-- Strategy Type Badge -->
-                        {% if strategy.strategy_type %}
-                        <span class="badge {% if strategy.strategy_type == 'options' %}badge-secondary{% else %}badge-primary{% endif %}">
-                            {{ strategy.strategy_type|upper }}
-                        </span>
-                        {% endif %}
-                        
-                        <!-- Profitability Badge -->
-                        {% if strategy.profitability_label %}
-                            {% if strategy.profitability_label == 'high_profit' %}
-                            <span class="badge badge-success">High Profit</span>
-                            {% elif strategy.profitability_label == 'medium_profit' %}
-                            <span class="badge badge-info">Medium Profit</span>
-                            {% elif strategy.profitability_label == 'low_profit' %}
-                            <span class="badge badge-warning">Low Profit</span>
-                            {% elif strategy.profitability_label == 'losses' %}
-                            <span class="badge badge-error">Losses</span>
-                            {% else %}
-                            <span class="badge badge-ghost">Unknown</span>
-                            {% endif %}
-                        {% endif %}
-                        
-                        <!-- Status Badge -->
+                    <div class="flex gap-2">
                         {% if strategy.is_error %}
                             {% if 'master contract' in strategy.error_message|lower %}
                             <span class="badge badge-warning">Waiting</span>
@@ -217,25 +168,22 @@
                     {% endif %}
                     
                     <!-- Performance Metrics -->
-                    {% if strategy.total_trades > 0 %}
-                    <div class="divider my-2"></div>
-                    <div class="bg-base-200 rounded-lg p-3 space-y-1">
-                        <div class="flex justify-between text-xs">
-                            <span class="font-semibold">Total PnL:</span>
-                            <span class="{% if strategy.total_pnl > 0 %}text-success{% elif strategy.total_pnl < 0 %}text-error{% else %}text-base-content/70{% endif %}">
-                                Rs {{ "%.2f"|format(strategy.total_pnl) }}
+                    {% if strategy.performance and strategy.performance.total_trades > 0 %}
+                    <div class="mt-3 pt-3 border-t border-base-300">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-semibold text-sm">Performance (30 days):</span>
+                            <span class="text-sm {% if strategy.performance.pnl > 0 %}text-success{% elif strategy.performance.pnl < 0 %}text-error{% else %}text-base-content/70{% endif %}">
+                                {% if strategy.performance.pnl >= 0 %}+{% endif %}Rs {{ "%.2f"|format(strategy.performance.pnl) }}
+                                ({% if strategy.performance.pnl_percent >= 0 %}+{% endif %}{{ "%.2f"|format(strategy.performance.pnl_percent) }}%)
                             </span>
                         </div>
-                        <div class="flex justify-between text-xs">
-                            <span class="font-semibold">Win Rate:</span>
-                            <span class="{% if strategy.win_rate >= 70 %}text-success{% elif strategy.win_rate >= 50 %}text-info{% else %}text-warning{% endif %}">
-                                {{ "%.1f"|format(strategy.win_rate) }}%
-                            </span>
+                        <div class="flex justify-between text-xs text-base-content/60">
+                            <span>Total Trades: {{ strategy.performance.total_trades }}</span>
                         </div>
-                        <div class="flex justify-between text-xs">
-                            <span class="font-semibold">Trades:</span>
-                            <span class="text-base-content/70">{{ strategy.total_trades }} ({{ strategy.winning_trades }}W / {{ strategy.losing_trades }}L)</span>
-                        </div>
+                    </div>
+                    {% elif strategy.performance and strategy.performance.total_trades == 0 %}
+                    <div class="mt-3 pt-3 border-t border-base-300">
+                        <div class="text-xs text-base-content/60">No trades recorded yet</div>
                     </div>
                     {% endif %}
                     
@@ -991,85 +939,108 @@ setInterval(async () => {
     }
 }, 10000);
 
-// Filter strategies
-function filterStrategies() {
-    const typeFilter = document.getElementById('filter_type').value;
-    const profitabilityFilter = document.getElementById('filter_profitability').value;
-    const sortBy = document.getElementById('sort_by').value;
+// Start all strategies
+async function startAllStrategies() {
+    const button = document.getElementById('start-all-btn');
+    const originalText = button.innerHTML;
     
-    const cards = document.querySelectorAll('.strategy-card');
-    let visibleCount = 0;
+    button.disabled = true;
+    button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Starting...';
     
-    cards.forEach(card => {
-        const strategyType = card.getAttribute('data-strategy-type');
-        const profitability = card.getAttribute('data-profitability');
+    try {
+        const response = await fetch('/python/start-all', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken()
+            }
+        });
+        const data = await response.json();
         
-        let show = true;
-        
-        // Type filter
-        if (typeFilter !== 'all' && strategyType !== typeFilter) {
-            show = false;
-        }
-        
-        // Profitability filter
-        if (profitabilityFilter !== 'all' && profitability !== profitabilityFilter) {
-            show = false;
-        }
-        
-        // Show/hide card
-        if (show) {
-            card.style.display = 'block';
-            visibleCount++;
+        if (data.success) {
+            showToast(data.message || `Started ${data.started_count || 0} strategies`, 'success');
+            setTimeout(() => location.reload(), 2000);
         } else {
-            card.style.display = 'none';
+            showToast(data.message || 'Failed to start all strategies', 'error');
         }
-    });
-    
-    // Sort visible cards
-    const grid = document.getElementById('strategies_grid');
-    const visibleCards = Array.from(cards).filter(c => c.style.display !== 'none');
-    
-    visibleCards.sort((a, b) => {
-        if (sortBy === 'name') {
-            return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
-        } else if (sortBy === 'pnl') {
-            return parseFloat(b.getAttribute('data-pnl')) - parseFloat(a.getAttribute('data-pnl'));
-        } else if (sortBy === 'win_rate') {
-            return parseFloat(b.getAttribute('data-win-rate')) - parseFloat(a.getAttribute('data-win-rate'));
-        } else if (sortBy === 'type') {
-            return a.getAttribute('data-strategy-type').localeCompare(b.getAttribute('data-strategy-type'));
-        }
-        return 0;
-    });
-    
-    // Reorder in DOM
-    visibleCards.forEach(card => grid.appendChild(card));
-    
-    // Show message if no strategies visible
-    const emptyState = document.querySelector('.text-center.py-16');
-    if (visibleCount === 0 && cards.length > 0) {
-        if (!emptyState || emptyState.style.display === 'none') {
-            const msg = document.createElement('div');
-            msg.className = 'alert alert-info mt-4';
-            msg.innerHTML = '<span>No strategies match the selected filters</span>';
-            grid.parentNode.insertBefore(msg, grid);
-        }
-    } else if (emptyState) {
-        emptyState.remove();
+    } catch (error) {
+        showToast('Failed to start all strategies', 'error');
+        console.error('Start all error:', error);
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalText;
     }
 }
 
-// Reset filters
-function resetFilters() {
-    document.getElementById('filter_type').value = 'all';
-    document.getElementById('filter_profitability').value = 'all';
-    document.getElementById('sort_by').value = 'name';
-    filterStrategies();
+// Stop all strategies
+async function stopAllStrategies() {
+    const button = document.getElementById('stop-all-btn');
+    const originalText = button.innerHTML;
+    
+    if (!confirm('Are you sure you want to stop all running strategies?')) {
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Stopping...';
+    
+    try {
+        const response = await fetch('/python/stop-all', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken()
+            }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(data.message || `Stopped ${data.stopped_count || 0} strategies`, 'success');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            showToast(data.message || 'Failed to stop all strategies', 'error');
+        }
+    } catch (error) {
+        showToast('Failed to stop all strategies', 'error');
+        console.error('Stop all error:', error);
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalText;
+    }
 }
 
-// Initialize filters on page load
-document.addEventListener('DOMContentLoaded', function() {
-    filterStrategies();
-});
+// Restart all strategies
+async function restartAllStrategies() {
+    const button = document.getElementById('restart-all-btn');
+    const originalText = button.innerHTML;
+    
+    if (!confirm('Are you sure you want to restart all strategies? This will stop all running strategies and then start them again.')) {
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Restarting...';
+    
+    try {
+        const response = await fetch('/python/restart-all', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken()
+            }
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast(data.message || `Restarted strategies: stopped ${data.stopped_count || 0}, started ${data.started_count || 0}`, 'success');
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            showToast(data.message || 'Failed to restart all strategies', 'error');
+        }
+    } catch (error) {
+        showToast('Failed to restart all strategies', 'error');
+        console.error('Restart all error:', error);
+    } finally {
+        button.disabled = false;
+        button.innerHTML = originalText;
+    }
+}
 </script>
 {% endblock %}

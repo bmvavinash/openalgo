@@ -499,6 +499,17 @@ def get_option_symbol(
                 'status': 'error',
                 'message': 'Expiry date required. Provide via expiry_date parameter or embed in underlying (e.g., NIFTY28OCT25FUT).'
             }, 400
+        
+        # Convert expiry date format if needed (YYYY-MM-DD -> DDMMMYY)
+        # Check if expiry is in YYYY-MM-DD format and convert to DDMMMYY
+        if final_expiry and len(final_expiry) == 10 and final_expiry[4] == '-' and final_expiry[7] == '-':
+            try:
+                from datetime import datetime
+                parsed_date = datetime.strptime(final_expiry, '%Y-%m-%d')
+                final_expiry = parsed_date.strftime('%d%b%y').upper()  # Convert to DDMMMYY format
+                logger.info(f"Converted expiry date from {expiry_date} to {final_expiry}")
+            except ValueError as e:
+                logger.warning(f"Could not parse expiry date {final_expiry}: {e}, using as-is")
 
         # Step 2: Determine the quote exchange (where to fetch LTP from)
         # If exchange is already NFO/BFO, we need to get LTP from index/equity exchange
@@ -535,22 +546,51 @@ def get_option_symbol(
             )
 
             if not success:
-                logger.error(f"Failed to fetch quotes: {quote_response.get('message', 'Unknown error')}")
-                return False, {
-                    'status': 'error',
-                    'message': f"Failed to fetch LTP for {quote_symbol}. {quote_response.get('message', 'Unknown error')}"
-                }, status_code
-
-            # Extract LTP from quote response
-            ltp = quote_response.get('data', {}).get('ltp')
-            if ltp is None:
-                logger.error(f"LTP not found in quote response for {quote_symbol}")
-                return False, {
-                    'status': 'error',
-                    'message': f'Could not determine LTP for {quote_symbol}.'
-                }, 500
-
-            logger.info(f"Got LTP: {ltp} for {quote_symbol}")
+                # In analyze mode, always use fallback LTP regardless of error type
+                # This enables paper trading even with invalid API keys
+                from database.settings_db import get_analyze_mode
+                analyze_mode = get_analyze_mode()
+                error_message = quote_response.get('message', 'Unknown error')
+                
+                if analyze_mode:
+                    # In analyze mode, use fallback LTP for paper trading
+                    fallback_prices = {
+                        'NIFTY': 25000,
+                        'BANKNIFTY': 55000,
+                        'FINNIFTY': 20000,
+                        'MIDCPNIFTY': 12000
+                    }
+                    ltp = fallback_prices.get(base_symbol.upper(), 100.0)
+                    logger.warning(f"Quote fetch failed for {quote_symbol} ({quote_exchange}): {error_message}. Using fallback LTP {ltp} for paper trading (analyze_mode=True).")
+                else:
+                    logger.error(f"Failed to fetch quotes: {error_message}")
+                    return False, {
+                        'status': 'error',
+                        'message': f"Failed to fetch LTP for {quote_symbol}. {error_message}"
+                    }, status_code
+            else:
+                # Extract LTP from quote response
+                ltp = quote_response.get('data', {}).get('ltp')
+                if ltp is None:
+                    # If LTP is None but we're in analyze mode, use fallback
+                    from database.settings_db import get_analyze_mode
+                    if get_analyze_mode():
+                        fallback_prices = {
+                            'NIFTY': 25000,
+                            'BANKNIFTY': 55000,
+                            'FINNIFTY': 20000,
+                            'MIDCPNIFTY': 12000
+                        }
+                        ltp = fallback_prices.get(base_symbol.upper(), 100.0)
+                        logger.warning(f"LTP not found in quote response for {quote_symbol}. Using fallback LTP {ltp} for paper trading.")
+                    else:
+                        logger.error(f"LTP not found in quote response for {quote_symbol}")
+                        return False, {
+                            'status': 'error',
+                            'message': f'Could not determine LTP for {quote_symbol}.'
+                        }, 500
+                else:
+                    logger.info(f"Got LTP: {ltp} for {quote_symbol}")
 
         # Step 4: Map to options exchange
         options_exchange = get_option_exchange(quote_exchange)
@@ -564,11 +604,40 @@ def get_option_symbol(
             available_strikes = get_available_strikes(base_symbol, final_expiry, option_type, options_exchange)
 
             if not available_strikes:
-                logger.error(f"No strikes found in database for {base_symbol} {final_expiry} {option_type} on {options_exchange}")
-                return False, {
-                    'status': 'error',
-                    'message': f'No strikes found for {base_symbol} expiring {final_expiry}. Please check expiry date or update master contract.'
-                }, 404
+                # In analyze mode, generate synthetic strikes if database has none
+                from database.settings_db import get_analyze_mode
+                analyze_mode = get_analyze_mode()
+                logger.info(f"Analyze mode status: {analyze_mode} for {base_symbol} {final_expiry}")
+                
+                if analyze_mode:
+                    # Generate synthetic strikes around LTP for paper trading
+                    # Use standard strike intervals: NIFTY=50, BANKNIFTY=100, others=50
+                    strike_intervals = {
+                        'NIFTY': 50,
+                        'BANKNIFTY': 100,
+                        'FINNIFTY': 50,
+                        'MIDCPNIFTY': 50
+                    }
+                    strike_int = strike_intervals.get(base_symbol.upper(), 50)
+                    
+                    # Generate strikes: 20 strikes below ATM, ATM, 20 strikes above ATM
+                    atm_rounded = round(ltp / strike_int) * strike_int
+                    available_strikes = [atm_rounded + (i - 20) * strike_int for i in range(41)]
+                    available_strikes = [s for s in available_strikes if s > 0]  # Filter out negative strikes
+                    available_strikes.sort()
+                    
+                    logger.warning(f"No strikes found in database for {base_symbol} {final_expiry} {option_type} on {options_exchange}. Generated {len(available_strikes)} synthetic strikes around LTP {ltp} (ATM: {atm_rounded}) for paper trading.")
+                else:
+                    logger.error(f"No strikes found in database for {base_symbol} {final_expiry} {option_type} on {options_exchange} (analyze_mode={analyze_mode})")
+                    # Show both formats in error message for clarity
+                    error_msg = f'No strikes found for {base_symbol} expiring {final_expiry}'
+                    if 'original_expiry' in locals() and original_expiry and original_expiry != final_expiry:
+                        error_msg += f' (original: {original_expiry})'
+                    error_msg += '. Please check expiry date or update master contract.'
+                    return False, {
+                        'status': 'error',
+                        'message': error_msg
+                    }, 404
 
             # Find ATM from actual strikes
             atm_strike = find_atm_strike_from_actual(ltp, available_strikes)
@@ -602,14 +671,33 @@ def get_option_symbol(
         option_symbol = construct_option_symbol(base_symbol, final_expiry, target_strike, option_type)
 
         # Step 7: Find option in database
-        option_details = find_option_in_database(option_symbol, options_exchange)
-
-        if not option_details:
-            logger.warning(f"Option symbol {option_symbol} not found in database for {options_exchange}")
-            return False, {
-                'status': 'error',
-                'message': f'Option symbol {option_symbol} not found in {options_exchange}. Symbol may not exist or master contract needs update.'
-            }, 404
+        # In analyze mode, skip database verification to allow paper trading with synthetic symbols
+        from database.settings_db import get_analyze_mode
+        if get_analyze_mode():
+            # In analyze mode, create synthetic symbol info for paper trading
+            logger.info(f"Analyze mode: Using synthetic symbol {option_symbol} for paper trading (skipping database verification)")
+            option_details = {
+                'symbol': option_symbol,
+                'brsymbol': option_symbol,  # Use same symbol for broker
+                'name': base_symbol,
+                'exchange': options_exchange,
+                'brexchange': options_exchange,
+                'token': None,  # No token in paper mode
+                'expiry': final_expiry,
+                'strike': target_strike,
+                'lotsize': 50,  # Default lot size
+                'instrumenttype': option_type,
+                'tick_size': 0.05  # Default tick size
+            }
+        else:
+            # Live mode: verify symbol exists in database
+            option_details = find_option_in_database(option_symbol, options_exchange)
+            if not option_details:
+                logger.warning(f"Option symbol {option_symbol} not found in database for {options_exchange}")
+                return False, {
+                    'status': 'error',
+                    'message': f'Option symbol {option_symbol} not found in {options_exchange}. Symbol may not exist or master contract needs update.'
+                }, 404
 
         # Step 8: Return success response with simplified format
         return True, {

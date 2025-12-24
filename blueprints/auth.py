@@ -166,11 +166,23 @@ def skip_broker():
     # Set session flags for paper trading access
     # We need 'logged_in' for session validity check, but we'll use analyzer mode
     from utils.session import set_session_login_time, get_session_expiry_time
+    from database.settings_db import get_analyze_mode
+    
     session['logged_in'] = True
     session['paper_trading_mode'] = True
     session.permanent = True
     current_app.permanent_session_lifetime = get_session_expiry_time()
     set_session_login_time()
+    
+    # Ensure analyze mode is enabled in settings
+    try:
+        analyze_mode = get_analyze_mode()
+        if not analyze_mode:
+            logger.info("Analyze mode not enabled in settings - enabling for paper trading")
+            from database.settings_db import set_analyze_mode
+            set_analyze_mode(True)
+    except Exception as e:
+        logger.warning(f"Could not check/set analyze mode: {e}")
     
     logger.info(f"User {session.get('user')} skipping broker selection, redirecting to analyzer for paper trading")
     return redirect(url_for('analyzer_bp.analyzer'))

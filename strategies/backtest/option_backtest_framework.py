@@ -507,3 +507,4 @@ class AnalyticsCalculator:
             exit_reasons=exit_reasons,
             trades=trades_dict
         )
+

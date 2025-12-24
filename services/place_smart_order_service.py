@@ -312,6 +312,26 @@ def place_smart_order(
 
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # Check if in analyze/paper trading mode - route to sandbox FIRST
+        from database.settings_db import get_analyze_mode
+        if get_analyze_mode():
+            logger.info(f"Paper trading mode detected - routing to sandbox for API key: {api_key[:10]}...{api_key[-4:]}")
+            from services.sandbox_service import sandbox_place_smart_order
+            success, response_data, status_code = sandbox_place_smart_order(
+                order_data,
+                api_key,
+                original_data
+            )
+            # Store complete request data without apikey
+            analyzer_request = copy.deepcopy(original_data)
+            if 'apikey' in analyzer_request:
+                analyzer_request.pop('apikey', None)
+            analyzer_request['api_type'] = 'placesmartorder'
+            # Log to analyzer database
+            from database.analyzer_db import async_log_analyzer
+            executor.submit(async_log_analyzer, analyzer_request, response_data, 'placesmartorder')
+            return success, response_data, status_code
+        
         # Check if order should be routed to Action Center (semi-auto mode)
         from services.order_router_service import should_route_to_pending, queue_order
 

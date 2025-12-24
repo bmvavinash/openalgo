@@ -226,3 +226,4 @@ config = BacktestConfig(
 - [ ] Portfolio-level backtesting
 - [ ] Interactive visualization
 - [ ] Parameter optimization
+
