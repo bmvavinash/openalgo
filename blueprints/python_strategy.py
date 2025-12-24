@@ -380,6 +380,27 @@ def start_strategy_process(strategy_id):
         if not config:
             return False, "Strategy configuration not found"
         
+        # Check performance filter if enabled
+        try:
+            from strategy_execution_filter import StrategyExecutionFilter
+            from database.settings_db import get_user_setting
+            
+            # Get user's category preferences (if set)
+            user_id = session.get('user') if hasattr(session, 'get') else None
+            if user_id:
+                allowed_categories = get_user_setting(user_id, 'strategy_allowed_categories')
+                if allowed_categories:
+                    allowed_categories = json.loads(allowed_categories) if isinstance(allowed_categories, str) else allowed_categories
+                    filter_obj = StrategyExecutionFilter()
+                    strategy_name = config.get('name', strategy_id)
+                    
+                    if not filter_obj.config.should_start_strategy(strategy_name, allowed_categories):
+                        category = filter_obj.config.get_strategy_info(strategy_name).get('category', 'unknown')
+                        return False, f"Strategy '{strategy_name}' is in '{category}' category, which is not allowed. Allowed categories: {', '.join(allowed_categories)}"
+        except Exception as e:
+            logger.warning(f"Error checking performance filter: {e}")
+            # Continue execution if filter check fails
+        
         # Validate scalping configuration
         scalping_enabled = config.get('scalping_enabled', False)
         stop_loss_pct = config.get('stop_loss_pct')

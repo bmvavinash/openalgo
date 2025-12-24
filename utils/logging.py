@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from typing import Optional
+import platform
+import time
+import shutil
 
 # Load environment variables if .env file exists
 try:
@@ -54,6 +57,81 @@ else:
     LOG_COLORS = {}
     COMPONENT_COLORS = {}
 
+
+class WindowsCompatibleTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """
+    Windows-compatible TimedRotatingFileHandler that handles file locking issues.
+    Uses copy-then-truncate instead of rename on Windows to avoid PermissionError.
+    """
+    
+    def doRollover(self):
+        """
+        Override doRollover to handle Windows file locking issues.
+        Uses copy-then-truncate method on Windows instead of rename.
+        """
+        if platform.system() == 'Windows':
+            # Windows-compatible rotation using copy-then-truncate
+            if self.stream:
+                self.stream.close()
+                self.stream = None
+            
+            # Calculate rotation destination filename
+            # Format: baseFilename.YYYY-MM-DD
+            current_time = time.time()
+            dstTime = self.computeRollover(current_time)
+            dfn = self.baseFilename + "." + time.strftime(self.suffix, time.localtime(dstTime))
+            
+            # Try to rotate with retries
+            max_retries = 5
+            retry_delay = 0.5
+            
+            for attempt in range(max_retries):
+                try:
+                    # Check if destination file exists and remove it
+                    if os.path.exists(dfn):
+                        try:
+                            os.remove(dfn)
+                        except (PermissionError, OSError):
+                            pass  # Ignore if can't remove
+                    
+                    # Copy current file to destination if it exists and has content
+                    if os.path.exists(self.baseFilename) and os.path.getsize(self.baseFilename) > 0:
+                        try:
+                            shutil.copy2(self.baseFilename, dfn)
+                            # Truncate the original file by opening in write mode
+                            with open(self.baseFilename, 'w', encoding=self.encoding or 'utf-8') as f:
+                                f.write('')  # Clear file
+                        except (PermissionError, OSError) as e:
+                            if attempt < max_retries - 1:
+                                time.sleep(retry_delay)
+                                retry_delay *= 2
+                                continue
+                            else:
+                                # Log error but don't crash - use stderr to avoid recursion
+                                import sys
+                                print(f"Warning: Failed to rotate log file: {e}", file=sys.stderr)
+                    
+                    # Success - break retry loop
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        retry_delay *= 2
+                    else:
+                        # Last attempt failed - log to stderr to avoid recursion
+                        import sys
+                        print(f"Warning: Failed to rotate log file after {max_retries} attempts: {e}", file=sys.stderr)
+            
+            # Reopen the log file
+            try:
+                if not self.stream:
+                    self.stream = self._open()
+            except Exception as e:
+                import sys
+                print(f"Warning: Failed to reopen log file: {e}", file=sys.stderr)
+        else:
+            # Use standard rotation for non-Windows systems
+            super().doRollover()
 
 class SensitiveDataFilter(logging.Filter):
     """Filter to redact sensitive information from log messages."""
@@ -244,14 +322,24 @@ def setup_logging():
         cleanup_old_logs(log_path, log_retention)
         
         # Create file handler with daily rotation
+        # Use Windows-compatible handler on Windows to avoid file locking issues
         log_file = log_path / f"openalgo_{datetime.now().strftime('%Y-%m-%d')}.log"
-        file_handler = TimedRotatingFileHandler(
-            filename=str(log_file),
-            when='midnight',
-            interval=1,
-            backupCount=log_retention,
-            encoding='utf-8'
-        )
+        if platform.system() == 'Windows':
+            file_handler = WindowsCompatibleTimedRotatingFileHandler(
+                filename=str(log_file),
+                when='midnight',
+                interval=1,
+                backupCount=log_retention,
+                encoding='utf-8'
+            )
+        else:
+            file_handler = TimedRotatingFileHandler(
+                filename=str(log_file),
+                when='midnight',
+                interval=1,
+                backupCount=log_retention,
+                encoding='utf-8'
+            )
         file_handler.setFormatter(file_formatter)
         file_handler.addFilter(sensitive_filter)
         root_logger.addHandler(file_handler)

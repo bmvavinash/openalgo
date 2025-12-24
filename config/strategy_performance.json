@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "last_updated": null,
+  "performance_thresholds": {
+    "top_performance": 100.0,
+    "average_performance": 0.0,
+    "low_performance": -100.0
+  },
+  "strategies": {
+    "Test Strategy": {
+      "allowed_actions": [
+        "BUY"
+      ],
+      "restriction_type": "manual"
+    }
+  },
+  "categories": {
+    "top_performance": [],
+    "average_performance": [],
+    "low_performance": []
+  }
+}

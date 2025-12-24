@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strategy Performance Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .category-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .category-section h2 {
+            margin-top: 0;
+            color: #555;
+        }
+        .top-performance { border-left: 4px solid #4CAF50; }
+        .average-performance { border-left: 4px solid #FF9800; }
+        .low-performance { border-left: 4px solid #f44336; }
+        .strategy-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f9f9f9;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .strategy-info {
+            flex: 1;
+        }
+        .strategy-name {
+            font-weight: bold;
+            color: #333;
+        }
+        .strategy-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #4CAF50; color: white; }
+        .btn-secondary { background: #2196F3; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-warning { background: #FF9800; color: white; }
+        button:hover { opacity: 0.8; }
+        .preferences-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 5px;
+        }
+        .preferences-section h2 {
+            margin-top: 0;
+        }
+        .checkbox-group {
+            display: flex;
+            gap: 20px;
+            margin: 10px 0;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .badge-top { background: #4CAF50; color: white; }
+        .badge-average { background: #FF9800; color: white; }
+        .badge-low { background: #f44336; color: white; }
+        .badge-restricted { background: #9E9E9E; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Strategy Performance Management</h1>
+        
+        <div class="preferences-section">
+            <h2>Execution Preferences</h2>
+            <p>Select which performance categories should be allowed to start:</p>
+            <div class="checkbox-group">
+                <div class="checkbox-item">
+                    <input type="checkbox" id="top_performance" value="top_performance">
+                    <label for="top_performance">Top Performance</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="average_performance" value="average_performance">
+                    <label for="average_performance">Average Performance</label>
+                </div>
+                <div class="checkbox-item">
+                    <input type="checkbox" id="low_performance" value="low_performance">
+                    <label for="low_performance">Low Performance</label>
+                </div>
+            </div>
+            <button class="btn-primary" onclick="savePreferences()">Save Preferences</button>
+            <button class="btn-secondary" onclick="loadPreferences()">Load Current</button>
+            <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                <strong>Note:</strong> If no categories are selected, all strategies will be allowed to start.
+            </p>
+        </div>
+        
+        <div id="categories-container">
+            <!-- Categories will be loaded here -->
+        </div>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #fff3cd; border-radius: 5px;">
+            <h3>Actions</h3>
+            <button class="btn-primary" onclick="runDailyAnalysis()">Run Daily Analysis Now</button>
+            <button class="btn-secondary" onclick="refreshData()">Refresh Data</button>
+        </div>
+    </div>
+    
+    <script>
+        // Load preferences on page load
+        window.onload = function() {
+            loadPreferences();
+            loadCategories();
+        };
+        
+        function loadPreferences() {
+            fetch('/strategy-performance/user-preferences')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const allowed = data.allowed_categories || [];
+                        document.getElementById('top_performance').checked = allowed.includes('top_performance');
+                        document.getElementById('average_performance').checked = allowed.includes('average_performance');
+                        document.getElementById('low_performance').checked = allowed.includes('low_performance');
+                    }
+                })
+                .catch(e => console.error('Error loading preferences:', e));
+        }
+        
+        function savePreferences() {
+            const categories = [];
+            if (document.getElementById('top_performance').checked) categories.push('top_performance');
+            if (document.getElementById('average_performance').checked) categories.push('average_performance');
+            if (document.getElementById('low_performance').checked) categories.push('low_performance');
+            
+            fetch('/strategy-performance/user-preferences', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({allowed_categories: categories.length > 0 ? categories : null})
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Preferences saved successfully!');
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                })
+                .catch(e => {
+                    console.error('Error saving preferences:', e);
+                    alert('Error saving preferences');
+                });
+        }
+        
+        function loadCategories() {
+            fetch('/strategy-performance/categories')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        displayCategories(data.categories);
+                    }
+                })
+                .catch(e => console.error('Error loading categories:', e));
+        }
+        
+        function displayCategories(categories) {
+            const container = document.getElementById('categories-container');
+            container.innerHTML = '';
+            
+            const categoryNames = {
+                'top_performance': 'Top Performance',
+                'average_performance': 'Average Performance',
+                'low_performance': 'Low Performance'
+            };
+            
+            const categoryClasses = {
+                'top_performance': 'top-performance',
+                'average_performance': 'average-performance',
+                'low_performance': 'low-performance'
+            };
+            
+            for (const [key, strategies] of Object.entries(categories)) {
+                if (strategies.length === 0) continue;
+                
+                const section = document.createElement('div');
+                section.className = `category-section ${categoryClasses[key]}`;
+                
+                const title = document.createElement('h2');
+                title.textContent = `${categoryNames[key]} (${strategies.length})`;
+                section.appendChild(title);
+                
+                strategies.forEach(strategy => {
+                    const item = document.createElement('div');
+                    item.className = 'strategy-item';
+                    
+                    const info = document.createElement('div');
+                    info.className = 'strategy-info';
+                    
+                    const name = document.createElement('div');
+                    name.className = 'strategy-name';
+                    name.textContent = strategy.name;
+                    info.appendChild(name);
+                    
+                    const details = document.createElement('div');
+                    details.className = 'strategy-details';
+                    details.innerHTML = `
+                        Avg P&L: Rs ${strategy.avg_pnl.toFixed(2)} | 
+                        Allowed Actions: ${strategy.allowed_actions.join(', ')}
+                        ${strategy.restriction_type !== 'none' ? ' | <span class="status-badge badge-restricted">Restricted</span>' : ''}
+                    `;
+                    info.appendChild(details);
+                    
+                    item.appendChild(info);
+                    
+                    const actions = document.createElement('div');
+                    actions.className = 'actions';
+                    
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'btn-secondary';
+                    editBtn.textContent = 'Edit Restrictions';
+                    editBtn.onclick = () => editRestrictions(strategy.name, strategy.allowed_actions);
+                    actions.appendChild(editBtn);
+                    
+                    item.appendChild(actions);
+                    section.appendChild(item);
+                });
+                
+                container.appendChild(section);
+            }
+        }
+        
+        function editRestrictions(strategyName, currentActions) {
+            const actions = prompt(`Enter allowed actions for ${strategyName} (comma-separated: BUY, SELL):`, currentActions.join(', '));
+            if (actions) {
+                const actionList = actions.split(',').map(a => a.trim().toUpperCase()).filter(a => ['BUY', 'SELL'].includes(a));
+                
+                fetch('/strategy-performance/restriction', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        strategy_name: strategyName,
+                        allowed_actions: actionList
+                    })
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Restrictions updated!');
+                            loadCategories();
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(e => {
+                        console.error('Error updating restrictions:', e);
+                        alert('Error updating restrictions');
+                    });
+            }
+        }
+        
+        function runDailyAnalysis() {
+            if (confirm('Run daily analysis now? This will analyze today\'s performance and update categories.')) {
+                fetch('/strategy-performance/run-analysis', {method: 'POST'})
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Analysis started! Check logs for progress.');
+                            setTimeout(loadCategories, 5000); // Reload after 5 seconds
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(e => {
+                        console.error('Error running analysis:', e);
+                        alert('Error running analysis');
+                    });
+            }
+        }
+        
+        function refreshData() {
+            loadCategories();
+            loadPreferences();
+        }
+    </script>
+</body>
+</html>
+

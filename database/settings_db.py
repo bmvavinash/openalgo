@@ -204,3 +204,57 @@ def set_security_settings(threshold_404=None, ban_duration_404=None,
 
     db_session.commit()
     logger.info("Security settings updated successfully")
+
+# User-specific settings (stored as JSON in a simple key-value format)
+# For now, we'll use a simple approach - can be enhanced later with a proper UserSettings table
+
+_user_settings_cache = {}  # In-memory cache: {user_id: {key: value}}
+
+def get_user_setting(user_id: str, key: str, default=None):
+    """
+    Get user-specific setting
+    
+    Args:
+        user_id: User ID
+        key: Setting key
+        default: Default value if not found
+    
+    Returns:
+        Setting value or default
+    """
+    try:
+        # Check cache first
+        if user_id in _user_settings_cache and key in _user_settings_cache[user_id]:
+            return _user_settings_cache[user_id][key]
+        
+        # For now, return default (can be enhanced with database table later)
+        return default
+    except Exception as e:
+        logger.warning(f"Error getting user setting {key} for user {user_id}: {e}")
+        return default
+
+def set_user_setting(user_id: str, key: str, value):
+    """
+    Set user-specific setting
+    
+    Args:
+        user_id: User ID
+        key: Setting key
+        value: Setting value (will be JSON serialized if not string)
+    """
+    try:
+        import json
+        
+        # Initialize cache for user if needed
+        if user_id not in _user_settings_cache:
+            _user_settings_cache[user_id] = {}
+        
+        # Store in cache
+        _user_settings_cache[user_id][key] = value
+        
+        # TODO: Can be enhanced to store in database table for persistence
+        # For now, cache is sufficient as it's per-session
+        
+        logger.debug(f"User setting {key} set for user {user_id}")
+    except Exception as e:
+        logger.warning(f"Error setting user setting {key} for user {user_id}: {e}")

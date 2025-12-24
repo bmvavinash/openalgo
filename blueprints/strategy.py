@@ -44,6 +44,14 @@ scheduler = BackgroundScheduler(
 )
 scheduler.start()
 
+# Setup daily strategy analysis scheduler
+try:
+    from setup_daily_analysis_scheduler import setup_daily_analysis_scheduler
+    setup_daily_analysis_scheduler(scheduler)
+    logger.info("Daily strategy analysis scheduler integrated")
+except Exception as e:
+    logger.warning(f"Could not setup daily analysis scheduler: {e}")
+
 # Get base URL from environment or default to localhost
 BASE_URL = os.getenv('HOST_SERVER', 'http://127.0.0.1:5000')
 
