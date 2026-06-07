@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 from dataclasses import dataclass
 
-from option_backtest_framework import (
+from .option_backtest_framework import (
     OptionBacktestEngine, Trade, BacktestConfig
 )
 

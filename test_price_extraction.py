@@ -147,3 +147,9 @@ def test_price_extraction():
 if __name__ == "__main__":
     test_price_extraction()
 
+
+
+
+
+
+

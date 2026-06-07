@@ -34,8 +34,35 @@
                 loginStatus.classList.remove('alert-info');
                 loginStatus.classList.add('alert-success');
                 loginStatus.querySelector('span').textContent = 'Login successful';
-                // Redirect to analyzer for paper trading (skip broker selection)
-                window.location.href = '/analyzer';
+                // Check mode and redirect accordingly
+                // For live trading, redirect to broker login or dashboard
+                // For paper trading, redirect to analyzer
+                fetch('/settings/analyze-mode')
+                    .then(res => res.json())
+                    .then(modeData => {
+                        if (modeData.analyze_mode) {
+                            // Paper trading mode - redirect to analyzer
+                            window.location.href = '/analyzer';
+                        } else {
+                            // Live trading mode - redirect to broker login or dashboard
+                            // Check if broker is already connected
+                            fetch('/dashboard')
+                                .then(res => {
+                                    if (res.ok) {
+                                        window.location.href = '/dashboard';
+                                    } else {
+                                        window.location.href = '/auth/broker-login';
+                                    }
+                                })
+                                .catch(() => {
+                                    window.location.href = '/auth/broker-login';
+                                });
+                        }
+                    })
+                    .catch(() => {
+                        // Fallback: redirect to dashboard
+                        window.location.href = '/dashboard';
+                    });
             }
         } catch (error) {
             loginStatus.classList.remove('alert-info');

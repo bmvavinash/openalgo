@@ -46,7 +46,7 @@ class Strategy(Base):
     start_time = Column(String(5))  # HH:MM format
     end_time = Column(String(5))  # HH:MM format
     squareoff_time = Column(String(5))  # HH:MM format
-    scalping_enabled = Column(Boolean, default=False)  # Enable scalping for this strategy
+    scalping_enabled = Column(Boolean, default=False)  # Scalping disabled by default - requires more capital with minor profits
     stop_loss_pct = Column(Float, default=None)  # Stop loss percentage (required if scalping enabled)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

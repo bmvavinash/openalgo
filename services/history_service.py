@@ -146,11 +146,30 @@ def get_history(
         AUTH_TOKEN, FEED_TOKEN, broker_name = get_auth_token_broker(api_key, include_feed_token=True)
         if AUTH_TOKEN is None:
             if analyze_mode:
-                # In analyze mode, try to fetch historical data using yfinance
+                # In analyze mode, check data mode settings
+                from database.settings_db import get_data_mode_settings
+                data_settings = get_data_mode_settings()
+                data_mode = data_settings.get('data_mode', 'live')
+                
+                # If live mode OR end_date is today, always use LIVE data
+                from datetime import date
+                today = date.today()
+                if isinstance(end_date, str):
+                    end = datetime.strptime(end_date, '%Y-%m-%d')
+                else:
+                    end = datetime.combine(end_date, datetime.min.time()) if hasattr(end_date, 'date') else end_date
+                end_is_today = (end.date() == today if hasattr(end, 'date') else end == today)
+                
+                # Force LIVE mode if end_date is today
+                if end_is_today:
+                    data_mode = 'live'
+                    logger.info(f"End date is today - forcing LIVE data mode for {symbol}")
+                
+                # Try to fetch data using yfinance
                 try:
                     import yfinance as yf
                     import pandas as pd
-                    from datetime import datetime
+                    from datetime import datetime, timedelta, date
                     
                     # Map exchange codes to yfinance symbols
                     symbol_mapping = {
@@ -161,74 +180,122 @@ def get_history(
                     }
                     
                     yf_symbol = symbol_mapping.get(symbol.upper())
-                    if yf_symbol:
-                        ticker = yf.Ticker(yf_symbol)
+                    if not yf_symbol:
+                        # Try adding .NS suffix for stocks
+                        yf_symbol = f"{symbol.upper()}.NS"
+                    
+                    ticker = yf.Ticker(yf_symbol)
+                    
+                    # Convert interval to yfinance format
+                    interval_map = {
+                        '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m',
+                        '30m': '30m', '1h': '1h', '1d': '1d'
+                    }
+                    yf_interval = interval_map.get(interval.lower(), '5m')
+                    
+                    # Calculate period from dates - handle both string and date objects
+                    if isinstance(start_date, str):
+                        start = datetime.strptime(start_date, '%Y-%m-%d')
+                    else:
+                        start = datetime.combine(start_date, datetime.min.time()) if hasattr(start_date, 'date') else start_date
+                    
+                    if isinstance(end_date, str):
+                        end = datetime.strptime(end_date, '%Y-%m-%d')
+                    else:
+                        end = datetime.combine(end_date, datetime.min.time()) if hasattr(end_date, 'date') else end_date
+                    
+                    days_diff = (end - start).days
+                    
+                    # For LIVE mode or when end_date is today, fetch current data
+                    if data_mode == 'live' or end_is_today:
+                        hist = None
+                        # Try multiple periods - start with 5d (most reliable)
+                        for period_try in ['5d', '1d', '1mo']:
+                            try:
+                                if yf_interval in ['1m', '3m', '5m', '15m', '30m']:
+                                    hist = ticker.history(period=period_try, interval=yf_interval)
+                                else:
+                                    hist = ticker.history(period=period_try, interval=yf_interval)
+                                
+                                if not hist.empty:
+                                    if end_is_today and yf_interval in ['1m', '3m', '5m', '15m', '30m']:
+                                        # Filter to today's data only for intraday
+                                        hist = hist[hist.index.date == today]
+                                        if not hist.empty:
+                                            logger.info(f"Fetched LIVE data for {symbol} using period={period_try} ({len(hist)} rows)")
+                                            break
+                                    else:
+                                        logger.info(f"Fetched LIVE data for {symbol} using period={period_try} ({len(hist)} rows)")
+                                        break
+                            except Exception as e:
+                                logger.debug(f"Failed to fetch with period={period_try}: {e}")
+                                continue
                         
-                        # Convert interval to yfinance format
-                        interval_map = {
-                            '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m',
-                            '30m': '30m', '1h': '1h', '1d': '1d'
-                        }
-                        yf_interval = interval_map.get(interval.lower(), '5m')
-                        
-                        # Calculate period from dates - handle both string and date objects
-                        if isinstance(start_date, str):
-                            start = datetime.strptime(start_date, '%Y-%m-%d')
-                        else:
-                            # Already a date/datetime object
-                            start = datetime.combine(start_date, datetime.min.time()) if hasattr(start_date, 'date') else start_date
-                        
-                        if isinstance(end_date, str):
-                            end = datetime.strptime(end_date, '%Y-%m-%d')
-                        else:
-                            # Already a date/datetime object
-                            end = datetime.combine(end_date, datetime.min.time()) if hasattr(end_date, 'date') else end_date
-                        
-                        days_diff = (end - start).days
-                        
-                        # yfinance: use either period OR start/end, not both
-                        # For intraday intervals, limit to 59 days max
+                        # If still empty, try info() method
+                        if hist is None or hist.empty:
+                            logger.info(f"Trying info() method for {symbol}")
+                            try:
+                                info = ticker.info
+                                current_price = info.get('regularMarketPrice') or info.get('currentPrice') or info.get('previousClose')
+                                if current_price:
+                                    now = datetime.now()
+                                    hist = pd.DataFrame({
+                                        'Open': [current_price],
+                                        'High': [current_price],
+                                        'Low': [current_price],
+                                        'Close': [current_price],
+                                        'Volume': [0]
+                                    }, index=[pd.Timestamp(now)])
+                                    logger.info(f"Using current price from info() for {symbol}: {current_price}")
+                            except Exception as e:
+                                logger.warning(f"Info() method also failed for {symbol}: {e}")
+                    else:
+                        # Historical mode - use date range
                         if yf_interval in ['1m', '3m', '5m', '15m', '30m']:
                             if days_diff <= 59:
-                                # Use period for short ranges
                                 hist = ticker.history(period=f'{days_diff + 1}d', interval=yf_interval)
                             else:
-                                # For longer ranges, use start/end but limit to 59 days
                                 limited_start = end - timedelta(days=59)
-                                end_date_str = end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
-                                hist = ticker.history(interval=yf_interval, start=limited_start.strftime('%Y-%m-%d'), end=end_date_str)
+                                start_str = limited_start.strftime('%Y-%m-%d')
+                                end_str = end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
+                                hist = ticker.history(interval=yf_interval, start=start_str, end=end_str)
                         else:
-                            # For daily intervals, use start/end
-                            start_date_str = start_date.strftime('%Y-%m-%d') if hasattr(start_date, 'strftime') else str(start_date)
-                            end_date_str = end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
-                            hist = ticker.history(interval=yf_interval, start=start_date_str, end=end_date_str)
+                            start_str = start_date.strftime('%Y-%m-%d') if hasattr(start_date, 'strftime') else str(start_date)
+                            end_str = end_date.strftime('%Y-%m-%d') if hasattr(end_date, 'strftime') else str(end_date)
+                            hist = ticker.history(interval=yf_interval, start=start_str, end=end_str)
+                    
+                    if not hist.empty:
+                        # Convert to expected format
+                        # Convert timestamp index to Unix timestamps (seconds)
+                        timestamps = [int(ts.timestamp()) if hasattr(ts, 'timestamp') else int(pd.to_datetime(ts).timestamp()) for ts in hist.index]
                         
-                        if not hist.empty:
-                            # Convert to expected format
-                            df = pd.DataFrame({
-                                'timestamp': hist.index,
-                                'open': hist['Open'].values,
-                                'high': hist['High'].values,
-                                'low': hist['Low'].values,
-                                'close': hist['Close'].values,
-                                'volume': hist['Volume'].values,
-                                'oi': [0] * len(hist)
-                            })
-                            
-                            logger.info(f"Fetched historical data for {symbol} via yfinance: {len(df)} records")
-                            return True, {
-                                'status': 'success',
-                                'data': df.to_dict(orient='records')
-                            }, 200
+                        df = pd.DataFrame({
+                            'timestamp': timestamps,
+                            'open': hist['Open'].values,
+                            'high': hist['High'].values,
+                            'low': hist['Low'].values,
+                            'close': hist['Close'].values,
+                            'volume': hist['Volume'].values,
+                            'oi': [0] * len(hist)
+                        })
+                        
+                        logger.info(f"Fetched data for {symbol} via yfinance: {len(df)} records (mode={data_mode})")
+                        return True, {
+                            'status': 'success',
+                            'data': df.to_dict(orient='records')
+                        }, 200
+                    else:
+                        logger.warning(f"No data returned from yfinance for {symbol}")
+                        
                 except ImportError:
-                    logger.warning("yfinance not available, skipping historical data fetch")
+                    logger.warning("yfinance not available, skipping data fetch")
                 except Exception as e:
-                    logger.warning(f"Failed to fetch historical data via yfinance for {symbol}: {e}")
+                    logger.error(f"Failed to fetch data via yfinance for {symbol}: {e}")
                     import traceback
                     logger.debug(traceback.format_exc())
                 
                 # Fallback: return empty DataFrame structure
-                logger.warning(f"Using empty historical data for {symbol} in analyze mode")
+                logger.warning(f"Using empty data for {symbol} in analyze mode")
                 return True, {
                     'status': 'success',
                     'data': []

@@ -12,11 +12,237 @@
         "BUY"
       ],
       "restriction_type": "manual"
+    },
+    "Bear Put Spread": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": 175.0,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-26T15:36:02.787494"
+        },
+        {
+          "period": "current_day",
+          "pnl": 175.0,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-29T15:35:05.735405"
+        },
+        {
+          "period": "current_day",
+          "pnl": 175.0,
+          "win_rate": 100.0,
+          "timestamp": "2026-02-05T15:35:03.597020"
+        }
+      ],
+      "category": "top_performance",
+      "avg_pnl": 175.0,
+      "last_updated": "2026-02-05T15:35:03.597020"
+    },
+    "Bull Call Spread": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": -175.0,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-26T15:36:03.807768"
+        },
+        {
+          "period": "current_day",
+          "pnl": -175.0,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-29T15:35:05.813503"
+        },
+        {
+          "period": "current_day",
+          "pnl": -175.0,
+          "win_rate": 0.0,
+          "timestamp": "2026-02-05T15:35:03.625941"
+        }
+      ],
+      "category": "low_performance",
+      "avg_pnl": -175.0,
+      "last_updated": "2026-02-05T15:35:03.625941"
+    },
+    "Iron Condor": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": 7.650390625,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-26T15:36:13.910831"
+        },
+        {
+          "period": "current_day",
+          "pnl": 9.80078125,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-29T15:35:05.814504"
+        },
+        {
+          "period": "current_day",
+          "pnl": 1.599609375,
+          "win_rate": 100.0,
+          "timestamp": "2026-02-05T15:35:03.628937"
+        }
+      ],
+      "category": "average_performance",
+      "avg_pnl": 6.350260416666667,
+      "last_updated": "2026-02-05T15:35:03.628937"
+    },
+    "Iron Butterfly": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": -2.349609375,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-26T15:36:15.974634"
+        },
+        {
+          "period": "current_day",
+          "pnl": -0.19921875,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-29T15:35:05.815500"
+        },
+        {
+          "period": "current_day",
+          "pnl": -8.400390625,
+          "win_rate": 0.0,
+          "timestamp": "2026-02-05T15:35:03.631925"
+        }
+      ],
+      "category": "low_performance",
+      "avg_pnl": -3.6497395833333335,
+      "last_updated": "2026-02-05T15:35:03.631925"
+    },
+    "Buy Straddle": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": -420.650390625,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-26T15:36:17.644199"
+        },
+        {
+          "period": "current_day",
+          "pnl": -420.80078125,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-29T15:35:05.816498"
+        },
+        {
+          "period": "current_day",
+          "pnl": -406.599609375,
+          "win_rate": 0.0,
+          "timestamp": "2026-02-05T15:35:03.636913"
+        }
+      ],
+      "category": "low_performance",
+      "avg_pnl": -416.0169270833333,
+      "last_updated": "2026-02-05T15:35:03.636913"
+    },
+    "Sell Straddle": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": 420.650390625,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-26T15:36:18.581798"
+        },
+        {
+          "period": "current_day",
+          "pnl": 420.80078125,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-29T15:35:05.838125"
+        },
+        {
+          "period": "current_day",
+          "pnl": 406.599609375,
+          "win_rate": 100.0,
+          "timestamp": "2026-02-05T15:35:03.639904"
+        }
+      ],
+      "category": "top_performance",
+      "avg_pnl": 416.0169270833333,
+      "last_updated": "2026-02-05T15:35:03.639904"
+    },
+    "Buy Strangle": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": -782.150390625,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-26T15:36:21.175285"
+        },
+        {
+          "period": "current_day",
+          "pnl": -781.30078125,
+          "win_rate": 0.0,
+          "timestamp": "2025-12-29T15:35:05.841116"
+        },
+        {
+          "period": "current_day",
+          "pnl": -764.099609375,
+          "win_rate": 0.0,
+          "timestamp": "2026-02-05T15:35:03.641899"
+        }
+      ],
+      "category": "low_performance",
+      "avg_pnl": -775.8502604166666,
+      "last_updated": "2026-02-05T15:35:03.641899"
+    },
+    "Sell Strangle": {
+      "performance_history": [
+        {
+          "period": "current_day",
+          "pnl": 782.150390625,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-26T15:36:23.451175"
+        },
+        {
+          "period": "current_day",
+          "pnl": 781.30078125,
+          "win_rate": 100.0,
+          "timestamp": "2025-12-29T15:35:05.842146"
+        },
+        {
+          "period": "current_day",
+          "pnl": 764.099609375,
+          "win_rate": 100.0,
+          "timestamp": "2026-02-05T15:35:03.643895"
+        }
+      ],
+      "category": "top_performance",
+      "avg_pnl": 775.8502604166666,
+      "last_updated": "2026-02-05T15:35:03.643895"
+    },
+    "Straddle": {
+      "allowed_actions": [
+        "SELL"
+      ],
+      "restriction_type": "manual"
+    },
+    "Strangle": {
+      "allowed_actions": [
+        "SELL"
+      ],
+      "restriction_type": "manual"
     }
   },
   "categories": {
-    "top_performance": [],
-    "average_performance": [],
-    "low_performance": []
+    "top_performance": [
+      "Bear Put Spread",
+      "Sell Straddle",
+      "Sell Strangle"
+    ],
+    "average_performance": [
+      "Iron Condor"
+    ],
+    "low_performance": [
+      "Test Strategy",
+      "Bull Call Spread",
+      "Iron Butterfly",
+      "Buy Straddle",
+      "Buy Strangle",
+      "Straddle",
+      "Strangle"
+    ]
   }
 }

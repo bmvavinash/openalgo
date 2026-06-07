@@ -141,29 +141,100 @@ def get_quotes(
                         'MIDCPNIFTY': '^NSEMIDCP'
                     }
                     
+                    # Check cache first
+                    from services.quote_cache import quote_cache
+                    cached_quote = quote_cache.get(symbol, exchange, ttl=5)  # 5 second cache
+                    if cached_quote:
+                        logger.debug(f"Using cached quote for {symbol}")
+                        return True, {
+                            'status': 'success',
+                            'data': cached_quote
+                        }, 200
+                    
                     yf_symbol = symbol_mapping.get(symbol.upper())
                     if yf_symbol:
                         ticker = yf.Ticker(yf_symbol)
-                        info = ticker.history(period='1d', interval='1m')
-                        if not info.empty:
-                            latest_price = float(info['Close'].iloc[-1])
-                            if latest_price > 0:
-                                logger.info(f"Fetched live quote for {symbol} via yfinance: LTP={latest_price}")
-                                return True, {
-                                    'status': 'success',
-                                    'data': {
-                                        'ltp': latest_price,
-                                        'symbol': symbol,
-                                        'exchange': exchange,
-                                        'bid': latest_price * 0.9999,  # Approximate bid
-                                        'ask': latest_price * 1.0001,  # Approximate ask
-                                        'high': float(info['High'].iloc[-1]) if 'High' in info.columns else latest_price,
-                                        'low': float(info['Low'].iloc[-1]) if 'Low' in info.columns else latest_price,
-                                        'open': float(info['Open'].iloc[-1]) if 'Open' in info.columns else latest_price,
-                                        'prev_close': float(info['Close'].iloc[-2]) if len(info) > 1 else latest_price,
-                                        'volume': int(info['Volume'].iloc[-1]) if 'Volume' in info.columns else 0
+                        
+                        # Try multiple methods to get current price (optimized order: fastest first)
+                        latest_price = None
+                        quote_data = {}
+                        
+                        # Method 1: Try fast_info first (fastest, lightweight)
+                        try:
+                            fast_info = ticker.fast_info
+                            latest_price = (fast_info.get('lastPrice') or 
+                                          fast_info.get('regularMarketPrice') or
+                                          fast_info.get('previousClose'))
+                            if latest_price and latest_price > 0:
+                                quote_data = {
+                                    'high': fast_info.get('dayHigh') or latest_price,
+                                    'low': fast_info.get('dayLow') or latest_price,
+                                    'open': fast_info.get('open') or latest_price,
+                                    'prev_close': fast_info.get('previousClose') or latest_price,
+                                    'volume': fast_info.get('volume') or 0
+                                }
+                                logger.debug(f"Fetched quote for {symbol} via fast_info: LTP={latest_price}")
+                        except Exception as e:
+                            logger.debug(f"fast_info failed for {symbol}: {e}")
+                        
+                        # Method 2: Try info() if fast_info fails (medium speed)
+                        if latest_price is None or latest_price <= 0:
+                            try:
+                                info_dict = ticker.info
+                                latest_price = (info_dict.get('regularMarketPrice') or 
+                                              info_dict.get('currentPrice') or 
+                                              info_dict.get('previousClose') or
+                                              info_dict.get('lastPrice') or
+                                              info_dict.get('price'))
+                                if latest_price and latest_price > 0:
+                                    quote_data = {
+                                        'high': info_dict.get('dayHigh') or info_dict.get('high') or latest_price,
+                                        'low': info_dict.get('dayLow') or info_dict.get('low') or latest_price,
+                                        'open': info_dict.get('open') or latest_price,
+                                        'prev_close': info_dict.get('previousClose') or latest_price,
+                                        'volume': info_dict.get('volume') or info_dict.get('regularMarketVolume') or 0
                                     }
-                                }, 200
+                                    logger.debug(f"Fetched quote for {symbol} via info(): LTP={latest_price}")
+                            except Exception as e:
+                                logger.debug(f"info() failed for {symbol}: {e}")
+                        
+                        # Method 3: Try history only if needed (slowest, use only 1d period)
+                        if latest_price is None or latest_price <= 0:
+                            try:
+                                info = ticker.history(period='1d', interval='1m')
+                                if not info.empty:
+                                    latest_price = float(info['Close'].iloc[-1])
+                                    if latest_price > 0:
+                                        quote_data = {
+                                            'high': float(info['High'].iloc[-1]) if 'High' in info.columns else latest_price,
+                                            'low': float(info['Low'].iloc[-1]) if 'Low' in info.columns else latest_price,
+                                            'open': float(info['Open'].iloc[-1]) if 'Open' in info.columns else latest_price,
+                                            'prev_close': float(info['Close'].iloc[-2]) if len(info) > 1 else latest_price,
+                                            'volume': int(info['Volume'].iloc[-1]) if 'Volume' in info.columns else 0
+                                        }
+                                        logger.debug(f"Fetched quote for {symbol} via history: LTP={latest_price}")
+                            except Exception as e:
+                                logger.debug(f"history() failed for {symbol}: {e}")
+                        
+                        if latest_price and latest_price > 0:
+                            quote_result = {
+                                'ltp': latest_price,
+                                'symbol': symbol,
+                                'exchange': exchange,
+                                'bid': latest_price * 0.9999,  # Approximate bid
+                                'ask': latest_price * 1.0001,  # Approximate ask
+                                'high': quote_data.get('high', latest_price),
+                                'low': quote_data.get('low', latest_price),
+                                'open': quote_data.get('open', latest_price),
+                                'prev_close': quote_data.get('prev_close', latest_price),
+                                'volume': quote_data.get('volume', 0)
+                            }
+                            # Cache the result
+                            quote_cache.set(symbol, exchange, quote_result, ttl=5)
+                            return True, {
+                                'status': 'success',
+                                'data': quote_result
+                            }, 200
                 except ImportError:
                     logger.debug("yfinance not available, skipping live quote fetch")
                 except Exception as e:

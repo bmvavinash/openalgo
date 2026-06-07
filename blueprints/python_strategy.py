@@ -561,13 +561,15 @@ def stop_strategy_process(strategy_id):
                 pid = STRATEGY_CONFIGS[strategy_id].get('pid')
                 if pid and check_process_status(pid):
                     try:
+                        logger.debug(f"Stopping orphaned process {pid} for strategy {strategy_id}")
                         terminate_process_cross_platform(pid)
                         STRATEGY_CONFIGS[strategy_id]['is_running'] = False
                         STRATEGY_CONFIGS[strategy_id]['pid'] = None
                         STRATEGY_CONFIGS[strategy_id]['last_stopped'] = get_ist_time().isoformat()
                         save_configs()
                         return True, "Strategy stopped"
-                    except:
+                    except Exception as e:
+                        logger.debug(f"Error stopping orphaned process: {e}")
                         pass
             return False, "Strategy not running"
         
@@ -575,6 +577,8 @@ def stop_strategy_process(strategy_id):
             strategy_info = RUNNING_STRATEGIES[strategy_id]
             process = strategy_info['process']
             pid = strategy_info['pid']
+            
+            logger.debug(f"Stopping strategy {strategy_id} (PID: {pid})")
             
             # Handle different process types
             if isinstance(process, subprocess.Popen):
@@ -584,12 +588,21 @@ def stop_strategy_process(strategy_id):
                     # Windows: Use terminate() then kill() if needed
                     try:
                         process.terminate()
-                        process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        # Force kill using taskkill
-                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
-                                     capture_output=True, check=False)
-                        process.wait(timeout=2)
+                        # Reduced timeout from 5s to 2s
+                        try:
+                            process.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            # Force kill using taskkill
+                            logger.debug(f"Process {pid} didn't terminate gracefully, force killing")
+                            subprocess.run(['taskkill', '/F', '/T', '/PID', str(pid)], 
+                                         capture_output=True, check=False, timeout=1)
+                            # Quick check if process is gone
+                            try:
+                                process.wait(timeout=0.5)
+                            except subprocess.TimeoutExpired:
+                                pass  # Process will be cleaned up later
+                    except ProcessLookupError:
+                        pass  # Process already dead
                 else:
                     # Unix-like systems (Linux, macOS)
                     try:
@@ -597,34 +610,55 @@ def stop_strategy_process(strategy_id):
                         try:
                             # Try SIGTERM first (graceful shutdown)
                             os.killpg(os.getpgid(pid), signal.SIGTERM)
-                            process.wait(timeout=5)
+                            # Reduced timeout from 5s to 2s
+                            try:
+                                process.wait(timeout=2)
+                            except subprocess.TimeoutExpired:
+                                raise  # Will be caught below
                         except OSError:
                             # Process might not be in a process group, kill it directly
                             process.terminate()
-                            process.wait(timeout=5)
+                            # Reduced timeout from 5s to 2s
+                            try:
+                                process.wait(timeout=2)
+                            except subprocess.TimeoutExpired:
+                                raise  # Will be caught below
                     except (subprocess.TimeoutExpired, ProcessLookupError):
                         try:
                             # Force kill with SIGKILL
+                            logger.debug(f"Process {pid} didn't terminate gracefully, force killing")
                             try:
                                 os.killpg(os.getpgid(pid), signal.SIGKILL)
                             except OSError:
                                 # Process might not be in a process group, kill it directly
                                 process.kill()
-                            process.wait(timeout=2)
+                            # Quick check if process is gone
+                            try:
+                                process.wait(timeout=0.5)
+                            except subprocess.TimeoutExpired:
+                                pass  # Process will be cleaned up later
                         except ProcessLookupError:
                             pass  # Process already dead
             elif hasattr(process, 'terminate'):
                 # For psutil.Process objects
                 try:
                     process.terminate()
-                    process.wait(timeout=5)
-                except psutil.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=2)
+                    # Reduced timeout from 5s to 2s
+                    try:
+                        process.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        logger.debug(f"Process {pid} didn't terminate gracefully, force killing")
+                        process.kill()
+                        # Quick check if process is gone
+                        try:
+                            process.wait(timeout=0.5)
+                        except psutil.TimeoutExpired:
+                            pass  # Process will be cleaned up later
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass  # Process already dead or no permission
             else:
                 # Fallback: use PID directly
+                logger.debug(f"Using fallback termination for PID {pid}")
                 terminate_process_cross_platform(pid)
             
             # Close log file handle
@@ -667,8 +701,8 @@ def terminate_process_cross_platform(pid):
         # Terminate main process
         process.terminate()
         
-        # Wait and kill if necessary
-        gone, alive = psutil.wait_procs([process] + children, timeout=3)
+        # Reduced timeout from 3s to 1.5s for faster termination
+        gone, alive = psutil.wait_procs([process] + children, timeout=1.5)
         for p in alive:
             try:
                 p.kill()
@@ -678,7 +712,7 @@ def terminate_process_cross_platform(pid):
     except psutil.NoSuchProcess:
         pass  # Process already dead
     except Exception as e:
-        logger.error(f"Error terminating process {pid}: {e}")
+        logger.debug(f"Error terminating process {pid}: {e}")
 
 def check_process_status(pid):
     """Check if a process is still running - cross-platform"""
@@ -1622,8 +1656,9 @@ def restart_all_strategies():
                     failed_stop_count += 1
                     stop_messages.append(f"{config.get('name', strategy_id)}: {message}")
         
-        # Wait a moment for processes to terminate
-        time.sleep(2)
+        # Wait a moment for processes to terminate (reduced from 2s to 1s for faster response)
+        if stopped_count > 0:
+            time.sleep(1)
         
         # Ensure initialization is done
         initialize_with_app_context()
@@ -2268,3 +2303,119 @@ def initialize_with_app_context():
 # The initialization is now handled in the index route and other entry points
 
 logger.info(f"Python Strategy System initialized (basic) on {OS_TYPE}")
+
+# Consolidated Log Viewer Route - Auto-reload test comment
+@python_strategy_bp.route('/logs-consolidated')
+@check_session_validity
+def consolidated_logs():
+    """Consolidated log viewer with categorization and filters"""
+    user_id = session.get('user')
+    if not user_id:
+        flash('Session expired', 'error')
+        return redirect(url_for('auth.login'))
+    
+    return render_template('python_strategy/logs_consolidated.html')
+
+@python_strategy_bp.route('/api/logs-consolidated', methods=['GET'])
+@check_session_validity
+def api_consolidated_logs():
+    """API endpoint for consolidated logs with categorization"""
+    user_id = session.get('user')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Session expired'}), 401
+    
+    try:
+        # Get filter parameters
+        strategy_type = request.args.get('strategy_type', 'all')  # 'all', 'options', 'intraday'
+        performance_level = request.args.get('performance_level', 'all')  # 'all', 'top', 'average', 'low'
+        lines_per_strategy = int(request.args.get('lines', 50))  # Number of log lines per strategy
+        
+        # Load strategy configs
+        load_configs()
+        
+        # Get performance config for categorization
+        from strategy_performance_config import StrategyPerformanceConfig
+        perf_config = StrategyPerformanceConfig()
+        categories = perf_config.get_all_categories()
+        
+        # Get all strategies with their logs
+        strategies_data = []
+        
+        for strategy_id, config in STRATEGY_CONFIGS.items():
+            # Verify ownership
+            strategy_owner = config.get('user_id')
+            if strategy_owner and strategy_owner != user_id:
+                continue
+            
+            strategy_name = config.get('name', strategy_id)
+            strategy_type_config = config.get('strategy_type', 'unknown')
+            is_running = config.get('is_running', False) or strategy_id in RUNNING_STRATEGIES
+            
+            # Get performance category
+            perf_category = 'low_performance'  # default
+            if strategy_name in categories.get('top_performance', []):
+                perf_category = 'top_performance'
+            elif strategy_name in categories.get('average_performance', []):
+                perf_category = 'average_performance'
+            
+            # Apply filters
+            if strategy_type != 'all' and strategy_type != strategy_type_config:
+                continue
+            
+            if performance_level != 'all':
+                if performance_level == 'top' and perf_category != 'top_performance':
+                    continue
+                elif performance_level == 'average' and perf_category != 'average_performance':
+                    continue
+                elif performance_level == 'low' and perf_category != 'low_performance':
+                    continue
+            
+            # Get latest log file
+            latest_log_file = None
+            log_content = []
+            log_file_name = None
+            log_modified = None
+            
+            try:
+                log_files = sorted(LOGS_DIR.glob(f"{strategy_id}_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+                if log_files:
+                    latest_log_file = log_files[0]
+                    log_file_name = latest_log_file.name
+                    log_modified = datetime.fromtimestamp(latest_log_file.stat().st_mtime, tz=IST)
+                    
+                    # Read last N lines
+                    with open(latest_log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                        all_lines = f.readlines()
+                        log_content = all_lines[-lines_per_strategy:] if len(all_lines) > lines_per_strategy else all_lines
+            except Exception as e:
+                logger.error(f"Error reading log for {strategy_id}: {e}")
+            
+            # Get performance metrics
+            perf_data = get_strategy_performance(strategy_name, days=30)
+            
+            strategies_data.append({
+                'strategy_id': strategy_id,
+                'name': strategy_name,
+                'type': strategy_type_config,
+                'performance_category': perf_category,
+                'is_running': is_running,
+                'log_content': ''.join(log_content),
+                'log_file_name': log_file_name,
+                'log_modified': log_modified.strftime('%Y-%m-%d %H:%M:%S IST') if log_modified else None,
+                'performance': perf_data
+            })
+        
+        # Sort by name
+        strategies_data.sort(key=lambda x: x['name'])
+        
+        return jsonify({
+            'success': True,
+            'strategies': strategies_data,
+            'total': len(strategies_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in consolidated logs API: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500

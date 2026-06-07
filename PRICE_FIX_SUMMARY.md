@@ -91,3 +91,9 @@ If prices still show as 0:
 - Existing orders in the database will show correct prices on next refresh
 - The template already handles displaying "-" for missing prices (except MARKET orders)
 
+
+
+
+
+
+

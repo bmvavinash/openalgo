@@ -1,0 +1,56 @@
+================================================================================
+COMPREHENSIVE ANALYSIS REPORT - 2025-12-25
+================================================================================
+
+WHY NO TRADES WERE TRIGGERED:
+--------------------------------------------------------------------------------
+Orders Created Today: 0
+Trades Executed Today: 0
+Server Down Errors: 2
+No Data Errors: 7
+Active Strategies: 0
+
+[WARNING] MAIN ISSUE: Server was down multiple times today!
+   Strategies couldn't fetch data via API
+   Solution: Use yfinance directly for historical analysis
+
+
+OPTIONS STRATEGIES ANALYSIS:
+--------------------------------------------------------------------------------
+
+Strategy: Bear Put Spread
+Symbol: NIFTY
+Start Price: Rs 26,142.10
+End Price: Rs 26,142.10
+Estimated P&L: Rs -67.10
+Scenario: Loss
+
+Strategy: Bull Call Spread
+Symbol: NIFTY
+Start Price: Rs 26,142.10
+End Price: Rs 26,142.10
+Estimated P&L: Rs -82.90
+Scenario: Loss
+
+Strategy: Bear Put Spread
+Symbol: BANKNIFTY
+Start Price: Rs 59,183.60
+End Price: Rs 59,183.60
+Estimated P&L: Rs -58.60
+Scenario: Loss
+
+Strategy: Bull Call Spread
+Symbol: BANKNIFTY
+Start Price: Rs 59,183.60
+End Price: Rs 59,183.60
+Estimated P&L: Rs -91.40
+Scenario: Loss
+
+
+PYTHON STRATEGIES ANALYSIS:
+--------------------------------------------------------------------------------
+No Python strategies results
+
+================================================================================
+Report generated at: 2025-12-25 20:00:39 IST
+================================================================================

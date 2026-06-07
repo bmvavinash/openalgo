@@ -179,6 +179,12 @@
                         </a>
                     </li>
                     <li>
+                        <a href="{{ url_for('strategy_performance_bp.index') }}" 
+                           class="{{ 'active' if request.endpoint.startswith('strategy_performance_bp.') }}">
+                            Strategy Performance
+                        </a>
+                    </li>
+                    <li>
                         <a href="{{ url_for('platforms_bp.index') }}"
                            class="{{ 'active' if request.endpoint == 'platforms_bp.index' or request.endpoint == 'tv_json_bp.tradingview_json' or request.endpoint == 'gc_json_bp.gocharting_json' or request.endpoint.startswith('chartink_bp.') }}">
                             Platforms
@@ -188,6 +194,12 @@
                         <a href="{{ url_for('strategy_bp.index') }}"
                            class="{{ 'active' if request.endpoint.startswith('strategy_bp.') }}">
                             Strategy
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('metals_bp.index') }}"
+                           class="{{ 'active' if request.endpoint.startswith('metals_bp.') }}">
+                            Metals (Gold & Silver)
                         </a>
                     </li>
                     <div class="divider"></div>

@@ -312,32 +312,26 @@ def place_smart_order(
 
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
-        # Check if in analyze/paper trading mode - route to sandbox FIRST
-        from database.settings_db import get_analyze_mode
-        if get_analyze_mode():
-            logger.info(f"Paper trading mode detected - routing to sandbox for API key: {api_key[:10]}...{api_key[-4:]}")
-            from services.sandbox_service import sandbox_place_smart_order
-            success, response_data, status_code = sandbox_place_smart_order(
-                order_data,
-                api_key,
-                original_data
-            )
-            # Store complete request data without apikey
-            analyzer_request = copy.deepcopy(original_data)
-            if 'apikey' in analyzer_request:
-                analyzer_request.pop('apikey', None)
-            analyzer_request['api_type'] = 'placesmartorder'
-            # Log to analyzer database
-            from database.analyzer_db import async_log_analyzer
-            executor.submit(async_log_analyzer, analyzer_request, response_data, 'placesmartorder')
-            return success, response_data, status_code
+        # Check if in analyze/paper trading mode - allow without broker auth
+        analyze_mode = get_analyze_mode()
         
-        # Check if order should be routed to Action Center (semi-auto mode)
-        from services.order_router_service import should_route_to_pending, queue_order
-
-        if should_route_to_pending(api_key, 'smartorder'):
-            return queue_order(api_key, original_data, 'smartorder')
-
+        if analyze_mode:
+            # In paper trading mode, verify API key but don't require broker auth
+            from database.auth_db import verify_api_key
+            user_id = verify_api_key(api_key)
+            if not user_id:
+                error_response = {
+                    'status': 'error',
+                    'message': 'Invalid openalgo apikey'
+                }
+                return False, error_response, 403
+            
+            # API key is valid - route to sandbox (paper trading)
+            logger.info(f"Paper trading mode: API key valid for user_id={user_id}, routing to sandbox")
+            from services.sandbox_service import sandbox_place_order
+            return sandbox_place_order(order_data, api_key, original_data)
+        
+        # Live trading mode - require broker authentication
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
             error_response = {

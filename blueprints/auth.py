@@ -4,7 +4,7 @@ from extensions import socketio
 import os
 from database.auth_db import upsert_auth, auth_cache, feed_token_cache
 from database.user_db import authenticate_user, User, db_session, find_user_by_username, find_user_by_email  # Import the function
-from database.settings_db import get_smtp_settings, set_smtp_settings
+from database.settings_db import get_smtp_settings, set_smtp_settings, get_analyze_mode
 from utils.email_utils import send_test_email, send_password_reset_email
 from utils.email_debug import debug_smtp_connection
 import re
@@ -33,12 +33,22 @@ def login():
     if find_user_by_username() is None:
         return redirect(url_for('core_bp.setup'))
 
-    # Check if already logged in - redirect to analyzer for paper trading
+    # Check if already logged in - redirect based on mode
     if session.get('logged_in'):
         # Verify session is still valid
         from utils.session import is_session_valid
         if is_session_valid():
-            return redirect(url_for('analyzer_bp.analyzer'))
+            # Check mode and redirect accordingly
+            analyze_mode = get_analyze_mode()
+            if analyze_mode:
+                # Paper trading mode - redirect to analyzer
+                return redirect(url_for('analyzer_bp.analyzer'))
+            else:
+                # Live trading mode - redirect to dashboard or broker login
+                if session.get('broker'):
+                    return redirect(url_for('dashboard_bp.dashboard'))
+                else:
+                    return redirect(url_for('auth.broker_login'))
         else:
             # Session expired, clear it
             session.clear()
@@ -166,7 +176,6 @@ def skip_broker():
     # Set session flags for paper trading access
     # We need 'logged_in' for session validity check, but we'll use analyzer mode
     from utils.session import set_session_login_time, get_session_expiry_time
-    from database.settings_db import get_analyze_mode
     
     session['logged_in'] = True
     session['paper_trading_mode'] = True

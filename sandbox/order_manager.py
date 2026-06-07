@@ -94,22 +94,53 @@ class OrderManager:
 
             # Get symbol info for lot size validation (from cache)
             symbol_obj = get_symbol_info(symbol, exchange)
+            
+            # In paper trading mode, allow synthetic symbols (generated for options)
+            # If symbol not found, create synthetic symbol info for paper trading
             if not symbol_obj:
-                return False, {
-                    'status': 'error',
-                    'message': f'Symbol {symbol} not found on {exchange}',
-                    'mode': 'analyze'
-                }, 400
+                from database.settings_db import get_analyze_mode
+                if get_analyze_mode():
+                    # Paper trading mode - create synthetic symbol info
+                    # Extract lot size from symbol or use defaults
+                    if exchange in ['NFO', 'BFO']:
+                        # NIFTY/BANKNIFTY options: lot size 50
+                        if 'NIFTY' in symbol and not 'BANKNIFTY' in symbol:
+                            lot_size = 50
+                        elif 'BANKNIFTY' in symbol:
+                            lot_size = 15
+                        else:
+                            lot_size = 50  # Default for NFO
+                    elif exchange in ['CDS', 'BCD']:
+                        lot_size = 1  # Currency options
+                    elif exchange in ['MCX', 'NCDEX']:
+                        lot_size = 1  # Commodity options
+                    else:
+                        lot_size = 1  # Default
+                    
+                    # Create synthetic symbol object
+                    from database.symbol import SymToken
+                    symbol_obj = SymToken()
+                    symbol_obj.symbol = symbol
+                    symbol_obj.exchange = exchange
+                    symbol_obj.lotsize = lot_size
+                    symbol_obj.tick_size = Decimal('0.05') if exchange in ['NFO', 'BFO'] else Decimal('0.01')
+                    logger.info(f"Using synthetic symbol info for {symbol} on {exchange} (lot_size={lot_size})")
+                else:
+                    # Live trading mode - symbol must exist
+                    return False, {
+                        'status': 'error',
+                        'message': f'Symbol {symbol} not found on {exchange}',
+                        'mode': 'analyze'
+                    }, 400
 
-            # Validate lot size for F&O
+            # Auto-adjust lot size for F&O (round to nearest multiple)
             if exchange in ['NFO', 'BFO', 'CDS', 'BCD', 'MCX', 'NCDEX']:
                 lot_size = symbol_obj.lotsize or 1
                 if quantity % lot_size != 0:
-                    return False, {
-                        'status': 'error',
-                        'message': f'Quantity must be in multiples of lot size {lot_size}',
-                        'mode': 'analyze'
-                    }, 400
+                    # Auto-adjust to nearest multiple of lot size (round up)
+                    adjusted_quantity = ((quantity + lot_size - 1) // lot_size) * lot_size
+                    logger.info(f"Auto-adjusting quantity from {quantity} to {adjusted_quantity} (lot size: {lot_size})")
+                    quantity = adjusted_quantity
 
             # Validate MIS orders - reject if after square-off time but before market open
             # Exception: Allow orders that reduce/close existing positions
@@ -276,6 +307,24 @@ class OrderManager:
                     'message': f'Unable to calculate margin: {margin_msg}',
                     'mode': 'analyze'
                 }, 400
+
+            # Validate trade value (quantity * price) against pricing limits
+            trade_value = Decimal(str(quantity)) * margin_calculation_price
+            from utils.pricing_config import get_pricing_config
+            pricing_config = get_pricing_config()
+            max_trade_value = pricing_config.get_max_trade_value(strategy_id=strategy if strategy else None)
+            
+            if trade_value > max_trade_value:
+                return False, {
+                    'status': 'error',
+                    'message': f'Trade value ₹{trade_value:.2f} exceeds maximum allowed ₹{max_trade_value:.2f}. '
+                              f'Please reduce quantity or price. (Quantity: {quantity}, Price: ₹{margin_calculation_price:.2f})',
+                    'mode': 'analyze',
+                    'trade_value': float(trade_value),
+                    'max_allowed': float(max_trade_value)
+                }, 400
+            
+            logger.debug(f"Trade value validation passed: ₹{trade_value:.2f} (limit: ₹{max_trade_value:.2f})")
 
             # Check if this order will close/reduce/reverse an existing position
             existing_position = SandboxPositions.query.filter_by(
@@ -501,16 +550,15 @@ class OrderManager:
             # Update order parameters
             if 'quantity' in new_data:
                 new_quantity = int(new_data['quantity'])
-                # Validate lot size (from cache)
+                # Auto-adjust lot size (from cache)
                 symbol_obj = get_symbol_info(order.symbol, order.exchange)
                 if symbol_obj and order.exchange in ['NFO', 'BFO', 'CDS', 'BCD', 'MCX', 'NCDEX']:
                     lot_size = symbol_obj.lotsize or 1
                     if new_quantity % lot_size != 0:
-                        return False, {
-                            'status': 'error',
-                            'message': f'Quantity must be in multiples of lot size {lot_size}',
-                            'mode': 'analyze'
-                        }, 400
+                        # Auto-adjust to nearest multiple of lot size (round up)
+                        adjusted_quantity = ((new_quantity + lot_size - 1) // lot_size) * lot_size
+                        logger.info(f"Auto-adjusting quantity from {new_quantity} to {adjusted_quantity} (lot size: {lot_size})")
+                        new_quantity = adjusted_quantity
                 order.quantity = new_quantity
                 order.pending_quantity = new_quantity
 

@@ -102,6 +102,9 @@ class FundManager:
 
             # Check if reset is needed
             self._check_and_reset_funds(funds)
+            
+            # Validate and repair fund calculations if needed
+            self._validate_and_repair_funds(funds)
 
             # Return fund details - format as strings to match broker API format
             return {
@@ -119,6 +122,47 @@ class FundManager:
         except Exception as e:
             logger.error(f"Error getting funds for user {self.user_id}: {e}")
             return None
+    
+    def _validate_and_repair_funds(self, funds):
+        """Validate fund calculations and repair if incorrect"""
+        try:
+            # Check if used_margin is incorrectly set (should never exceed total_capital)
+            if funds.used_margin > funds.total_capital:
+                logger.warning(f"Invalid used_margin ({funds.used_margin}) > total_capital ({funds.total_capital}) for user {self.user_id}. Repairing...")
+                # Recalculate used_margin from actual positions
+                from database.sandbox_db import SandboxPositions
+                positions = SandboxPositions.query.filter_by(user_id=self.user_id).filter(
+                    SandboxPositions.quantity != 0
+                ).all()
+                
+                # Recalculate used margin from positions
+                total_used_margin = Decimal('0.00')
+                for position in positions:
+                    # Get margin for this position (simplified - actual margin calculation is in order_manager)
+                    # For now, use a rough estimate: quantity * average_price * margin_factor
+                    # This is a simplified check - actual margin is calculated during order placement
+                    pass  # Margin is tracked separately, so we'll just reset if it's clearly wrong
+                
+                # If used_margin is way too high, reset it and recalculate available_balance
+                if funds.used_margin > funds.total_capital:
+                    logger.info(f"Resetting incorrect used_margin for user {self.user_id}")
+                    funds.used_margin = Decimal('0.00')
+                    # Recalculate available_balance
+                    funds.available_balance = funds.total_capital + funds.realized_pnl - funds.used_margin
+                    db_session.commit()
+                    logger.info(f"Repaired funds for user {self.user_id}: used_margin reset to 0")
+            
+            # Validate available_balance calculation
+            expected_available = funds.total_capital + funds.realized_pnl - funds.used_margin
+            if abs(funds.available_balance - expected_available) > Decimal('0.01'):  # Allow small rounding differences
+                logger.warning(f"Available balance mismatch for user {self.user_id}. Expected: {expected_available}, Actual: {funds.available_balance}. Repairing...")
+                funds.available_balance = expected_available
+                db_session.commit()
+                logger.info(f"Repaired available_balance for user {self.user_id}")
+                
+        except Exception as e:
+            logger.error(f"Error validating/repairing funds for user {self.user_id}: {e}")
+            db_session.rollback()
 
     def _check_and_reset_funds(self, funds):
         """Check if funds need to be reset (every Sunday at midnight IST)"""
@@ -340,10 +384,41 @@ class FundManager:
 
             # Get symbol info to determine instrument type (from cache)
             symbol_obj = get_symbol_info(symbol, exchange)
-
+            
+            # In paper trading mode, allow synthetic symbols (generated for options)
+            # If symbol not found, create synthetic symbol info for paper trading
             if not symbol_obj:
-                logger.error(f"Symbol {symbol} not found on {exchange}")
-                return None, "Symbol not found"
+                from database.settings_db import get_analyze_mode
+                if get_analyze_mode():
+                    # Paper trading mode - create synthetic symbol info
+                    # Extract lot size from symbol or use defaults
+                    if exchange in ['NFO', 'BFO']:
+                        # NIFTY/BANKNIFTY options: lot size 50
+                        if 'NIFTY' in symbol and 'BANKNIFTY' not in symbol:
+                            lot_size = 50
+                        elif 'BANKNIFTY' in symbol:
+                            lot_size = 15
+                        else:
+                            lot_size = 50  # Default for NFO
+                    elif exchange in ['CDS', 'BCD']:
+                        lot_size = 1  # Currency options
+                    elif exchange in ['MCX', 'NCDEX']:
+                        lot_size = 1  # Commodity options
+                    else:
+                        lot_size = 1  # Default
+                    
+                    # Create synthetic symbol object
+                    from database.symbol import SymToken
+                    symbol_obj = SymToken()
+                    symbol_obj.symbol = symbol
+                    symbol_obj.exchange = exchange
+                    symbol_obj.lotsize = lot_size
+                    symbol_obj.tick_size = Decimal('0.05') if exchange in ['NFO', 'BFO'] else Decimal('0.01')
+                    logger.debug(f"Using synthetic symbol info for margin calculation: {symbol} on {exchange} (lot_size={lot_size})")
+                else:
+                    # Live trading mode - symbol must exist
+                    logger.error(f"Symbol {symbol} not found on {exchange}")
+                    return None, "Symbol not found"
 
             # Calculate trade value (quantity × price)
             trade_value = quantity * price

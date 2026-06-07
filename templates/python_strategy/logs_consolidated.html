@@ -1,0 +1,635 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<style>
+    .log-container {
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 15px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    .log-line {
+        margin: 2px 0;
+        line-height: 1.4;
+    }
+    .log-error {
+        color: #f48771;
+    }
+    .log-warning {
+        color: #dcdcaa;
+    }
+    .log-info {
+        color: #4ec9b0;
+    }
+    .strategy-card {
+        transition: all 0.3s ease;
+    }
+    .strategy-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .filter-badge {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .filter-badge.active {
+        background-color: #3b82f6;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold mb-2">Consolidated Strategy Logs</h1>
+        <p class="text-gray-600">View all strategy logs in one place with categorization and controls</p>
+    </div>
+
+    <!-- Filters Section -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Filters</h2>
+            
+            <!-- Strategy Type Filter -->
+            <div class="mb-4">
+                <label class="label">
+                    <span class="label-text font-semibold">Strategy Type</span>
+                </label>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <button class="filter-badge badge badge-lg badge-outline active" data-filter="type" data-value="all">
+                        All Types
+                    </button>
+                    <button class="filter-badge badge badge-lg badge-outline" data-filter="type" data-value="options">
+                        Options
+                    </button>
+                    <button class="filter-badge badge badge-lg badge-outline" data-filter="type" data-value="intraday">
+                        Intraday
+                    </button>
+                </div>
+            </div>
+
+            <!-- Performance Level Filter -->
+            <div class="mb-4">
+                <label class="label">
+                    <span class="label-text font-semibold">Performance Level</span>
+                </label>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <button class="filter-badge badge badge-lg badge-outline active" data-filter="performance" data-value="all">
+                        All Performance
+                    </button>
+                    <button class="filter-badge badge badge-lg badge-outline badge-success" data-filter="performance" data-value="top">
+                        Top Performance
+                    </button>
+                    <button class="filter-badge badge badge-lg badge-outline badge-warning" data-filter="performance" data-value="average">
+                        Average Performance
+                    </button>
+                    <button class="filter-badge badge badge-lg badge-outline badge-error" data-filter="performance" data-value="low">
+                        Low Performance
+                    </button>
+                </div>
+            </div>
+
+            <!-- Auto-refresh Toggle -->
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                    <div>
+                        <label class="label">
+                            <span class="label-text font-semibold">Auto-refresh</span>
+                        </label>
+                        <input type="checkbox" class="toggle toggle-primary" id="autoRefresh" checked>
+                        <span class="ml-2 text-sm text-gray-600" id="refreshStatus">Enabled (10s)</span>
+                    </div>
+                    <div>
+                        <label class="label">
+                            <span class="label-text font-semibold">Lines per strategy</span>
+                        </label>
+                        <input type="number" class="input input-bordered input-sm w-20" id="linesPerStrategy" value="50" min="10" max="200">
+                    </div>
+                    <div>
+                        <label class="label">
+                            <span class="label-text font-semibold">Columns per row</span>
+                        </label>
+                        <select class="select select-bordered select-sm w-24" id="columnsPerRow">
+                            <option value="1">1 Column</option>
+                            <option value="2" selected>2 Columns</option>
+                            <option value="3">3 Columns</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="refreshLogs()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="text-center py-8">
+        <span class="loading loading-spinner loading-lg"></span>
+        <p class="mt-4 text-gray-600">Loading strategy logs...</p>
+    </div>
+
+    <!-- Strategies Logs Container -->
+    <div id="strategiesContainer" class="grid gap-4" style="display: none;">
+        <!-- Strategies will be inserted here -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="text-center py-12" style="display: none;">
+        <p class="text-gray-500 text-lg">No strategies found matching the current filters.</p>
+    </div>
+</div>
+
+<script>
+let refreshInterval = null;
+let currentFilters = {
+    strategy_type: 'all',
+    performance_level: 'all',
+    lines: 50
+};
+let currentColumns = 2;
+let strategiesCache = {}; // Cache to preserve logs during refresh
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    setupFilters();
+    setupAutoRefresh();
+    updateGridLayout(); // Set initial grid layout
+    refreshLogs();
+});
+
+function setupFilters() {
+    // Strategy type filters
+    document.querySelectorAll('[data-filter="type"]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-filter="type"]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentFilters.strategy_type = this.dataset.value;
+            refreshLogs();
+        });
+    });
+
+    // Performance level filters
+    document.querySelectorAll('[data-filter="performance"]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('[data-filter="performance"]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentFilters.performance_level = this.dataset.value;
+            refreshLogs();
+        });
+    });
+
+    // Lines per strategy
+    document.getElementById('linesPerStrategy').addEventListener('change', function() {
+        currentFilters.lines = parseInt(this.value) || 50;
+        refreshLogs();
+    });
+
+    // Columns per row
+    document.getElementById('columnsPerRow').addEventListener('change', function() {
+        currentColumns = parseInt(this.value) || 2;
+        updateGridLayout();
+        refreshLogs();
+    });
+}
+
+function updateGridLayout() {
+    const container = document.getElementById('strategiesContainer');
+    if (currentColumns === 1) {
+        container.className = 'grid grid-cols-1 gap-4';
+    } else if (currentColumns === 2) {
+        container.className = 'grid grid-cols-1 lg:grid-cols-2 gap-4';
+    } else if (currentColumns === 3) {
+        container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+    }
+}
+
+function setupAutoRefresh() {
+    const toggle = document.getElementById('autoRefresh');
+    toggle.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    startAutoRefresh();
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    refreshInterval = setInterval(refreshLogs, 10000); // 10 seconds
+    document.getElementById('refreshStatus').textContent = 'Enabled (10s)';
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+    document.getElementById('refreshStatus').textContent = 'Disabled';
+}
+
+async function refreshLogs() {
+    const container = document.getElementById('strategiesContainer');
+    const loading = document.getElementById('loadingIndicator');
+    const empty = document.getElementById('emptyState');
+    
+    // Don't hide container - keep existing logs visible
+    // Only show loading indicator if this is the first load
+    const isFirstLoad = container.children.length === 0;
+    if (isFirstLoad) {
+        container.style.display = 'none';
+        loading.style.display = 'block';
+    } else {
+        // Keep container visible, don't show loading indicator
+        loading.style.display = 'none';
+        container.style.display = 'grid';
+        // Only show refresh indicator if auto-refresh is enabled
+        if (document.getElementById('autoRefresh').checked) {
+            showRefreshIndicator();
+        }
+    }
+    empty.style.display = 'none';
+
+    try {
+        const params = new URLSearchParams({
+            strategy_type: currentFilters.strategy_type,
+            performance_level: currentFilters.performance_level,
+            lines: currentFilters.lines
+        });
+
+        const response = await fetch(`/python/api/logs-consolidated?${params}`);
+        const data = await response.json();
+
+        if (data.success) {
+            updateStrategies(data.strategies); // Use update instead of display
+            if (data.strategies.length === 0) {
+                empty.style.display = 'block';
+                container.style.display = 'none';
+            } else {
+                container.style.display = 'grid';
+            }
+        } else {
+            throw new Error(data.message || 'Failed to load logs');
+        }
+    } catch (error) {
+        console.error('Error loading logs:', error);
+        // Don't clear existing logs on error
+        if (container.children.length === 0) {
+            container.innerHTML = `<div class="alert alert-error col-span-full">Error loading logs: ${error.message}</div>`;
+            container.style.display = 'grid';
+        }
+    } finally {
+        loading.style.display = 'none';
+        hideRefreshIndicator();
+    }
+}
+
+function showRefreshIndicator() {
+    // Add a subtle refresh indicator at the top (only if auto-refresh is enabled)
+    if (!document.getElementById('autoRefresh').checked) {
+        return; // Don't show if auto-refresh is disabled
+    }
+    let indicator = document.getElementById('refreshIndicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'refreshIndicator';
+        indicator.className = 'fixed top-20 right-4 z-50';
+        indicator.innerHTML = `
+            <div class="alert alert-info shadow-lg">
+                <span class="loading loading-spinner loading-sm"></span>
+                <span class="ml-2">Refreshing logs...</span>
+            </div>
+        `;
+        document.body.appendChild(indicator);
+    }
+    indicator.style.display = 'block';
+    // Auto-hide after 2 seconds
+    setTimeout(() => {
+        hideRefreshIndicator();
+    }, 2000);
+}
+
+function hideRefreshIndicator() {
+    const indicator = document.getElementById('refreshIndicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+function updateStrategies(strategies) {
+    const container = document.getElementById('strategiesContainer');
+    
+    if (strategies.length === 0) {
+        // Only clear if we have no strategies
+        if (Object.keys(strategiesCache).length === 0) {
+            container.innerHTML = '';
+        }
+        return;
+    }
+
+    // Update grid layout
+    updateGridLayout();
+
+    // Update or create strategy cards
+    strategies.forEach(strategy => {
+        const strategyId = strategy.strategy_id;
+        let cardElement = document.getElementById(`strategy-card-${strategyId}`);
+        
+        if (cardElement) {
+            // Update existing card - preserve scroll position
+            updateStrategyCard(cardElement, strategy);
+        } else {
+            // Create new card
+            const newCard = createStrategyCard(strategy);
+            container.appendChild(newCard);
+        }
+        
+        // Update cache
+        strategiesCache[strategyId] = strategy;
+    });
+
+    // Remove cards for strategies that no longer match filters
+    const currentStrategyIds = new Set(strategies.map(s => s.strategy_id));
+    Object.keys(strategiesCache).forEach(cachedId => {
+        if (!currentStrategyIds.has(cachedId)) {
+            const cardToRemove = document.getElementById(`strategy-card-${cachedId}`);
+            if (cardToRemove) {
+                cardToRemove.remove();
+            }
+            delete strategiesCache[cachedId];
+        }
+    });
+}
+
+function createStrategyCard(strategy) {
+    const perfBadge = getPerformanceBadge(strategy.performance_category);
+    const typeBadge = getTypeBadge(strategy.type);
+    const statusBadge = strategy.is_running 
+        ? '<span class="badge badge-success">Running</span>' 
+        : '<span class="badge badge-error">Stopped</span>';
+    
+    const logContent = formatLogContent(strategy.log_content);
+    const perfInfo = strategy.performance ? 
+        `P&L: ₹${strategy.performance.pnl.toFixed(2)} (${strategy.performance.pnl_percent.toFixed(2)}%) | Trades: ${strategy.performance.total_trades}` : 
+        'No performance data';
+
+    const card = document.createElement('div');
+    card.id = `strategy-card-${strategy.strategy_id}`;
+    card.className = 'card bg-base-100 shadow-xl strategy-card';
+    card.innerHTML = `
+        <div class="card-body">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="card-title text-xl">${escapeHtml(strategy.name)}</h2>
+                    <div class="flex gap-2 mt-2">
+                        ${perfBadge}
+                        ${typeBadge}
+                        ${statusBadge}
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2">${perfInfo}</p>
+                    ${strategy.log_modified ? `<p class="text-xs text-gray-400 mt-1">Last updated: ${strategy.log_modified}</p>` : ''}
+                </div>
+                <div class="flex gap-2">
+                    ${getControlButtons(strategy)}
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="log-container" id="log-${strategy.strategy_id}">
+                ${logContent || '<p class="text-gray-500">No log content available</p>'}
+            </div>
+        </div>
+    `;
+
+    // Attach control listeners
+    attachControlListeners(strategy.strategy_id);
+    
+    return card;
+}
+
+function updateStrategyCard(cardElement, strategy) {
+    // Update status badge
+    const statusContainer = cardElement.querySelector('.flex.gap-2.mt-2');
+    if (statusContainer) {
+        const statusBadge = strategy.is_running 
+            ? '<span class="badge badge-success">Running</span>' 
+            : '<span class="badge badge-error">Stopped</span>';
+        // Update the status badge (last badge in the container)
+        const badges = statusContainer.querySelectorAll('.badge');
+        if (badges.length >= 3) {
+            badges[2].outerHTML = statusBadge;
+        }
+    }
+
+    // Update control buttons
+    const controlsContainer = cardElement.querySelector('.flex.gap-2:last-child');
+    if (controlsContainer) {
+        controlsContainer.innerHTML = getControlButtons(strategy);
+        attachControlListeners(strategy.strategy_id);
+    }
+
+    // Update log content - preserve scroll position
+    const logContainer = cardElement.querySelector(`#log-${strategy.strategy_id}`);
+    if (logContainer) {
+        const scrollPosition = logContainer.scrollTop;
+        const wasAtBottom = logContainer.scrollHeight - logContainer.scrollTop <= logContainer.clientHeight + 10;
+        
+        logContainer.innerHTML = formatLogContent(strategy.log_content) || '<p class="text-gray-500">No log content available</p>';
+        
+        // Restore scroll position or scroll to bottom if user was at bottom
+        if (wasAtBottom) {
+            logContainer.scrollTop = logContainer.scrollHeight;
+        } else {
+            logContainer.scrollTop = scrollPosition;
+        }
+    }
+
+    // Update performance info
+    const perfInfo = cardElement.querySelector('.text-sm.text-gray-500.mt-2');
+    if (perfInfo && strategy.performance) {
+        perfInfo.textContent = `P&L: ₹${strategy.performance.pnl.toFixed(2)} (${strategy.performance.pnl_percent.toFixed(2)}%) | Trades: ${strategy.performance.total_trades}`;
+    }
+
+    // Update last modified
+    const lastModified = cardElement.querySelector('.text-xs.text-gray-400.mt-1');
+    if (strategy.log_modified) {
+        if (lastModified) {
+            lastModified.textContent = `Last updated: ${strategy.log_modified}`;
+        }
+    }
+}
+
+function displayStrategies(strategies) {
+    // Legacy function - redirect to updateStrategies
+    updateStrategies(strategies);
+}
+
+function getPerformanceBadge(category) {
+    const badges = {
+        'top_performance': '<span class="badge badge-success">Top Performance</span>',
+        'average_performance': '<span class="badge badge-warning">Average Performance</span>',
+        'low_performance': '<span class="badge badge-error">Low Performance</span>'
+    };
+    return badges[category] || '<span class="badge badge-ghost">Unknown</span>';
+}
+
+function getTypeBadge(type) {
+    const badges = {
+        'options': '<span class="badge badge-info">Options</span>',
+        'intraday': '<span class="badge badge-primary">Intraday</span>'
+    };
+    return badges[type] || '<span class="badge badge-ghost">' + (type || 'Unknown') + '</span>';
+}
+
+function getControlButtons(strategy) {
+    const startBtn = strategy.is_running ? '' : `
+        <button class="btn btn-sm btn-success" onclick="startStrategy('${strategy.strategy_id}')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Start
+        </button>
+    `;
+    
+    const stopBtn = strategy.is_running ? `
+        <button class="btn btn-sm btn-error" onclick="stopStrategy('${strategy.strategy_id}')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6v4H9z" />
+            </svg>
+            Stop
+        </button>
+    ` : '';
+    
+    const restartBtn = strategy.is_running ? `
+        <button class="btn btn-sm btn-warning" onclick="restartStrategy('${strategy.strategy_id}')">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Restart
+        </button>
+    ` : '';
+
+    return startBtn + stopBtn + restartBtn;
+}
+
+function attachControlListeners(strategyId) {
+    // Listeners are attached via onclick in the HTML
+}
+
+async function startStrategy(strategyId) {
+    if (!confirm('Start this strategy?')) return;
+    
+    try {
+        const response = await fetch(`/python/start/${strategyId}`, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Strategy started successfully', 'success');
+            setTimeout(refreshLogs, 1000);
+        } else {
+            showNotification('Failed to start: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+async function stopStrategy(strategyId) {
+    if (!confirm('Stop this strategy?')) return;
+    
+    try {
+        const response = await fetch(`/python/stop/${strategyId}`, { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Strategy stopped successfully', 'success');
+            setTimeout(refreshLogs, 1000);
+        } else {
+            showNotification('Failed to stop: ' + data.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+async function restartStrategy(strategyId) {
+    if (!confirm('Restart this strategy? It will be stopped and then started again.')) return;
+    
+    try {
+        // Stop first
+        const stopResponse = await fetch(`/python/stop/${strategyId}`, { method: 'POST' });
+        const stopData = await stopResponse.json();
+        
+        if (stopData.success) {
+            // Wait a bit, then start
+            setTimeout(async () => {
+                const startResponse = await fetch(`/python/start/${strategyId}`, { method: 'POST' });
+                const startData = await startResponse.json();
+                
+                if (startData.success) {
+                    showNotification('Strategy restarted successfully', 'success');
+                    setTimeout(refreshLogs, 1000);
+                } else {
+                    showNotification('Failed to restart: ' + startData.message, 'error');
+                }
+            }, 2000);
+        } else {
+            showNotification('Failed to stop: ' + stopData.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Error: ' + error.message, 'error');
+    }
+}
+
+function formatLogContent(content) {
+    if (!content) return '';
+    
+    return content.split('\n').map(line => {
+        let className = 'log-line';
+        if (line.includes('ERROR') || line.includes('Error') || line.includes('Traceback')) {
+            className += ' log-error';
+        } else if (line.includes('WARNING') || line.includes('Warning')) {
+            className += ' log-warning';
+        } else if (line.includes('INFO') || line.includes('Info')) {
+            className += ' log-info';
+        }
+        return `<div class="${className}">${escapeHtml(line)}</div>`;
+    }).join('');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showNotification(message, type) {
+    // Simple notification - you can enhance this with a toast library
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+    const notification = document.createElement('div');
+    notification.className = `alert ${alertClass} fixed top-4 right-4 z-50 shadow-lg`;
+    notification.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button class="btn btn-sm btn-ghost" onclick="this.parentElement.remove()">×</button>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 5000);
+}
+</script>
+{% endblock %}
+

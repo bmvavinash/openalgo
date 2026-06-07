@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Metals Backtest Analysis{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+            <a href="{{ url_for('metals_bp.index') }}" class="btn btn-ghost btn-sm mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+            </a>
+            <h1 class="text-2xl font-bold">Backtest Analysis</h1>
+            <p class="text-base-content/70 mt-1">Run historical backtests and view performance across your metals strategies</p>
+        </div>
+    </div>
+
+    <!-- Run historical backtests -->
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">Run Historical Backtests</h2>
+            <p class="text-sm text-base-content/70">Runs backtests for all your metals strategies over the selected period (uses historical data; works when market is closed). Results are saved and shown below and on each strategy page.</p>
+            <form method="POST" action="{{ url_for('metals_bp.run_historical_backtests') }}" class="flex flex-wrap gap-4 items-end">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Start Date</span></label>
+                    <input type="date" name="start_date" value="{{ backtest_range }}" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">End Date</span></label>
+                    <input type="date" name="end_date" value="{{ now }}" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Timeframe</span></label>
+                    <select name="timeframe" class="select select-bordered">
+                        <option value="1d">1 day</option>
+                        <option value="5m" selected>5 minutes</option>
+                        <option value="15m">15 minutes</option>
+                        <option value="1h">1 hour</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Run Backtests for All Strategies</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Summary table: latest backtest per strategy -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">Latest Backtest by Strategy</h2>
+            <p class="text-sm text-base-content/70">Performance from the most recent backtest run for each strategy. Use "Run Backtest" on a strategy page for a single-strategy run with custom dates.</p>
+            {% if strategy_backtests %}
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Strategy</th>
+                            <th>Metal</th>
+                            <th>Type</th>
+                            <th>Period</th>
+                            <th>Trades</th>
+                            <th>Win Rate</th>
+                            <th>P&L</th>
+                            <th>P&L %</th>
+                            <th>Max DD %</th>
+                            <th>Sharpe</th>
+                            <th>Profit Factor</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sid, data in strategy_backtests.items() %}
+                        {% set s = data.strategy %}
+                        {% set bt = data.latest_backtest %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('metals_bp.view_strategy', strategy_id=s.id) }}" class="link link-hover font-medium">{{ s.name }}</a>
+                            </td>
+                            <td><span class="badge {% if s.metal_type == 'GOLD' %}badge-warning{% else %}badge-info{% endif %}">{{ s.metal_type }}</span></td>
+                            <td><span class="badge badge-outline">{{ s.instrument_type|default('MCX') }}</span></td>
+                            <td class="text-xs">
+                                {% if bt %}
+                                {{ bt.start_date.strftime('%Y-%m-%d') }} – {{ bt.end_date.strftime('%Y-%m-%d') }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            <td>{{ bt.total_trades if bt else '—' }}</td>
+                            <td>{% if bt %}{{ "%.1f"|format(bt.win_rate) }}%{% else %}—{% endif %}</td>
+                            <td class="{% if bt and bt.total_pnl and bt.total_pnl > 0 %}text-success{% elif bt and bt.total_pnl and bt.total_pnl < 0 %}text-error{% endif %}">
+                                {% if bt and bt.total_pnl is not none %}₹{{ "%.2f"|format(bt.total_pnl) }}{% else %}—{% endif %}
+                            </td>
+                            <td>{% if bt and bt.total_pnl_pct is not none %}{{ "%.2f"|format(bt.total_pnl_pct) }}%{% else %}—{% endif %}</td>
+                            <td>{% if bt and bt.max_drawdown_pct is not none %}{{ "%.2f"|format(bt.max_drawdown_pct) }}%{% else %}—{% endif %}</td>
+                            <td>{% if bt and bt.sharpe_ratio is not none %}{{ "%.2f"|format(bt.sharpe_ratio) }}{% else %}—{% endif %}</td>
+                            <td>{% if bt and bt.profit_factor is not none %}{{ "%.2f"|format(bt.profit_factor) }}{% else %}—{% endif %}</td>
+                            <td>
+                                {% if bt %}
+                                <span class="badge badge-sm {% if bt.status == 'COMPLETED' %}badge-success{% else %}badge-warning{% endif %}">{{ bt.status }}</span>
+                                {% else %}
+                                <span class="badge badge-ghost">No backtest</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('metals_bp.run_backtest', strategy_id=s.id) }}" class="btn btn-ghost btn-xs">Run Backtest</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-base-content/70">No strategies yet. <a href="{{ url_for('metals_bp.new_strategy') }}" class="link">Create a metals strategy</a> first, then run historical backtests above.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

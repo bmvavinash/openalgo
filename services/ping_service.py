@@ -47,6 +47,27 @@ def get_ping(api_key: Optional[str] = None, auth_token: Optional[str] = None, br
     """
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # Check if in analyze/paper trading mode - allow without broker auth
+        analyze_mode = get_analyze_mode()
+        
+        if analyze_mode:
+            # In paper trading mode, verify API key but don't require broker auth
+            from database.auth_db import verify_api_key
+            user_id = verify_api_key(api_key)
+            if not user_id:
+                error_response = {
+                    'status': 'error',
+                    'message': 'Invalid openalgo apikey'
+                }
+                return False, error_response, 403
+            
+            # API key is valid - route to sandbox or return success for paper trading
+            logger.info(f"Paper trading mode: API key valid for user_id={user_id}")
+            # For order placement services, route to sandbox
+            # For read-only services, return empty/sandbox data
+            # This will be handled by individual service implementations
+        
+        # Live trading mode - require broker authentication
         AUTH_TOKEN, broker_name = get_auth_token_broker(api_key)
         if AUTH_TOKEN is None:
             return False, {

@@ -187,7 +187,7 @@ class PositionManager:
             for position in positions:
                 symbols_to_fetch.add((position.symbol, position.exchange))
 
-            # Fetch quotes for all symbols
+            # Fetch quotes for all symbols (cache will prevent duplicate API calls)
             quote_cache = {}
             for symbol, exchange in symbols_to_fetch:
                 quote = self._fetch_quote(symbol, exchange)
@@ -309,8 +309,15 @@ class PositionManager:
             return Decimal('0.00')
 
     def _fetch_quote(self, symbol, exchange):
-        """Fetch real-time quote for a symbol using API key"""
+        """Fetch real-time quote for a symbol using API key (with caching)"""
         try:
+            # Check cache first
+            from services.quote_cache import quote_cache
+            cached_quote = quote_cache.get(symbol, exchange, ttl=5)
+            if cached_quote:
+                logger.debug(f"Using cached quote for {symbol} on {exchange}")
+                return cached_quote
+            
             # Get any user's API key for fetching quotes
             from database.auth_db import ApiKeys, decrypt_token
             api_key_obj = ApiKeys.query.first()
@@ -322,7 +329,7 @@ class PositionManager:
             # Decrypt the API key
             api_key = decrypt_token(api_key_obj.api_key_encrypted)
 
-            # Use quotes service with API key authentication
+            # Use quotes service with API key authentication (will cache internally)
             success, response, status_code = get_quotes(
                 symbol=symbol,
                 exchange=exchange,

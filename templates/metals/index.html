@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Metals Trading{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold">Metals Trading</h1>
+            <p class="text-base-content/70 mt-1">Gold & Silver trading with adaptive stop-loss</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{{ url_for('metals_bp.analysis') }}" class="btn btn-outline">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Backtest Analysis
+            </a>
+            <a href="{{ url_for('metals_bp.new_strategy') }}" class="btn btn-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                New Strategy
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-figure text-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div class="stat-title">Gold Strategies</div>
+            <div class="stat-value text-warning">{{ gold_count }}</div>
+            <div class="stat-desc">Active trading strategies</div>
+        </div>
+        
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-figure text-info">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+            </div>
+            <div class="stat-title">Silver Strategies</div>
+            <div class="stat-value text-info">{{ silver_count }}</div>
+            <div class="stat-desc">Active trading strategies</div>
+        </div>
+        
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-figure text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+            </div>
+            <div class="stat-title">Open Trades</div>
+            <div class="stat-value text-primary">{{ open_trades|length }}</div>
+            <div class="stat-desc">Currently active</div>
+        </div>
+        
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-figure text-success">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
+            <div class="stat-title">Total Strategies</div>
+            <div class="stat-value text-success">{{ strategies|length }}</div>
+            <div class="stat-desc">All metals</div>
+        </div>
+    </div>
+
+    <!-- Open Positions -->
+    {% if open_trades %}
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">
+                <span class="badge badge-primary badge-lg">{{ open_trades|length }}</span>
+                Open Positions
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Metal</th>
+                            <th>Symbol</th>
+                            <th>Action</th>
+                            <th>Entry Price</th>
+                            <th>Stop Loss</th>
+                            <th>Current P&L</th>
+                            <th>Entry Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trade in open_trades %}
+                        <tr>
+                            <td>
+                                <span class="badge {% if trade.metal_type == 'GOLD' %}badge-warning{% else %}badge-info{% endif %}">
+                                    {{ trade.metal_type }}
+                                </span>
+                            </td>
+                            <td>{{ trade.symbol }}</td>
+                            <td>
+                                <span class="badge {% if trade.action == 'BUY' %}badge-success{% else %}badge-error{% endif %}">
+                                    {{ trade.action }}
+                                </span>
+                            </td>
+                            <td>₹{{ "%.2f"|format(trade.entry_price) }}</td>
+                            <td>₹{{ "%.2f"|format(trade.current_stop_loss or 0) }}</td>
+                            <td class="{% if trade.pnl and trade.pnl > 0 %}text-success{% elif trade.pnl and trade.pnl < 0 %}text-error{% endif %}">
+                                ₹{{ "%.2f"|format(trade.pnl or 0) }}
+                            </td>
+                            <td>{{ trade.entry_time.strftime('%Y-%m-%d %H:%M') if trade.entry_time else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Strategies Grid -->
+    <h2 class="text-xl font-bold mb-4">Your Strategies</h2>
+    {% if strategies %}
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {% for strategy in strategies %}
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title flex justify-between">
+                    <span class="truncate">{{ strategy.name }}</span>
+                    <div class="flex gap-2">
+                        <div class="badge {% if strategy.is_active %}badge-success{% else %}badge-error{% endif %}">
+                            {{ 'Active' if strategy.is_active else 'Inactive' }}
+                        </div>
+                        <div class="badge {% if strategy.metal_type == 'GOLD' %}badge-warning{% else %}badge-info{% endif %}">
+                            {{ strategy.metal_type }}
+                        </div>
+                    </div>
+                </h2>
+                
+                <div class="text-sm opacity-70 mt-2 space-y-1">
+                    <p>Mode: {{ strategy.trading_mode }}</p>
+                    <p>Segment: {{ strategy.instrument_type|default('MCX') }} — {% if strategy.end_time %}{{ strategy.end_time }} close{% else %}—{% endif %}</p>
+                    <p>Stop Loss: {{ strategy.stop_loss_type }} ({{ strategy.stop_loss_pct }}%)</p>
+                    <p>Take Profit: {% if strategy.take_profit_enabled %}{{ strategy.take_profit_pct }}%{% else %}Disabled{% endif %}</p>
+                    {% if strategy.start_time and strategy.end_time %}
+                    <p>Trading Hours: {{ strategy.start_time }} - {{ strategy.end_time }} IST</p>
+                    {% endif %}
+                    {% if strategy.sell_before_market_close %}
+                    <p class="text-success">Sell before close: {{ strategy.square_off_minutes_before_close|default(15) }} min before</p>
+                    {% endif %}
+                </div>
+                
+                <div class="flex gap-2 mt-2">
+                    {% if strategy.telegram_alerts %}
+                    <span class="badge badge-sm badge-outline">Telegram</span>
+                    {% endif %}
+                    {% if strategy.whatsapp_alerts %}
+                    <span class="badge badge-sm badge-outline">WhatsApp</span>
+                    {% endif %}
+                </div>
+
+                <div class="card-actions justify-end mt-4">
+                    <a href="{{ url_for('metals_bp.view_strategy', strategy_id=strategy.id) }}" class="btn btn-primary btn-sm">
+                        View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-base-200 rounded-xl border-2 border-dashed border-base-300">
+        <div class="max-w-md mx-auto">
+            <div class="text-5xl mb-4">&#x1F4A0;</div>
+            <h3 class="text-xl font-semibold mb-2">No metals strategies yet</h3>
+            <p class="text-base-content/70 mb-2">This is normal when you first visit. You haven't created any Gold or Silver strategies.</p>
+            <p class="text-base-content/60 text-sm mb-6">Click the button below to create your first strategy (Gold or Silver) with stop-loss and backtesting.</p>
+            <a href="{{ url_for('metals_bp.new_strategy') }}" class="btn btn-primary btn-lg gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+                </svg>
+                Create your first strategy
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Trades -->
+    {% if recent_trades %}
+    <div class="card bg-base-100 shadow-xl mt-8">
+        <div class="card-body">
+            <div class="flex justify-between items-center">
+                <h2 class="card-title">Recent Trades</h2>
+                <a href="{{ url_for('metals_bp.trade_history') }}" class="btn btn-sm btn-ghost">View All</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Metal</th>
+                            <th>Action</th>
+                            <th>Entry</th>
+                            <th>Exit</th>
+                            <th>P&L</th>
+                            <th>Exit Reason</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trade in recent_trades %}
+                        <tr>
+                            <td>
+                                <span class="badge {% if trade.metal_type == 'GOLD' %}badge-warning{% else %}badge-info{% endif %}">
+                                    {{ trade.metal_type }}
+                                </span>
+                            </td>
+                            <td>{{ trade.action }}</td>
+                            <td>₹{{ "%.2f"|format(trade.entry_price) }}</td>
+                            <td>₹{{ "%.2f"|format(trade.exit_price or 0) }}</td>
+                            <td class="{% if trade.pnl and trade.pnl > 0 %}text-success{% elif trade.pnl and trade.pnl < 0 %}text-error{% endif %}">
+                                ₹{{ "%.2f"|format(trade.pnl or 0) }} ({{ "%.2f"|format(trade.pnl_pct or 0) }}%)
+                            </td>
+                            <td>
+                                <span class="badge badge-sm badge-ghost">{{ trade.exit_reason or 'Open' }}</span>
+                            </td>
+                            <td>{{ trade.entry_time.strftime('%Y-%m-%d') if trade.entry_time else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Quick Guide -->
+<div class="container mx-auto px-4 pb-8">
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Metals Trading Guide</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="font-semibold text-warning mb-2">🥇 Gold Trading</h3>
+                    <ul class="list-disc list-inside text-sm opacity-80 space-y-1">
+                        <li>Safe-haven asset during uncertainty</li>
+                        <li>Inverse correlation with USD</li>
+                        <li>Recommended stop loss: 1.5-2%</li>
+                        <li>Best trading hours: 9AM-11PM IST</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-info mb-2">🪙 Silver Trading</h3>
+                    <ul class="list-disc list-inside text-sm opacity-80 space-y-1">
+                        <li>Higher volatility than gold</li>
+                        <li>Industrial demand component</li>
+                        <li>Recommended stop loss: 2-3%</li>
+                        <li>Tends to outperform gold in bull markets</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="alert alert-info mt-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <h3 class="font-bold">Adaptive Stop-Loss</h3>
+                    <p class="text-sm">Our adaptive stop-loss mechanism automatically adjusts based on market volatility, 
+                    providing better protection during high-volatility periods and tighter stops during calm markets.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

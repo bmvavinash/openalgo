@@ -45,3 +45,9 @@ The fix has been tested and verified:
 
 The log rotation issue is resolved. The application will now handle log file rotation smoothly on Windows without permission errors.
 
+
+
+
+
+
+

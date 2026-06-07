@@ -39,6 +39,11 @@ class Settings(Base):
     id = Column(Integer, primary_key=True)
     analyze_mode = Column(Boolean, default=False)  # Default to Live Mode
 
+    # Data Mode Configuration
+    data_mode = Column(String(20), default='live')  # 'live' or 'historical'
+    historical_duration = Column(String(50), nullable=True)  # 'current_day', 'previous_day', 'current_week', 'previous_week', 'current_month', '6_months', '1_year'
+    historical_data_source = Column(String(20), default='yfinance')  # 'yfinance' or 'database'
+
     # SMTP Configuration
     smtp_server = Column(String(255), nullable=True)
     smtp_port = Column(Integer, nullable=True)
@@ -232,6 +237,37 @@ def get_user_setting(user_id: str, key: str, default=None):
     except Exception as e:
         logger.warning(f"Error getting user setting {key} for user {user_id}: {e}")
         return default
+
+def get_data_mode_settings():
+    """Get data mode configuration"""
+    settings = Settings.query.first()
+    if not settings:
+        settings = Settings(analyze_mode=False, data_mode='live', historical_data_source='yfinance')
+        db_session.add(settings)
+        db_session.commit()
+    
+    return {
+        'data_mode': settings.data_mode or 'live',
+        'historical_duration': settings.historical_duration or 'current_day',
+        'historical_data_source': settings.historical_data_source or 'yfinance'
+    }
+
+def set_data_mode_settings(data_mode=None, historical_duration=None, historical_data_source=None):
+    """Set data mode configuration"""
+    settings = Settings.query.first()
+    if not settings:
+        settings = Settings(analyze_mode=False)
+        db_session.add(settings)
+    
+    if data_mode is not None:
+        settings.data_mode = data_mode
+    if historical_duration is not None:
+        settings.historical_duration = historical_duration
+    if historical_data_source is not None:
+        settings.historical_data_source = historical_data_source
+    
+    db_session.commit()
+    logger.info(f"Data mode settings updated: mode={data_mode}, duration={historical_duration}, source={historical_data_source}")
 
 def set_user_setting(user_id: str, key: str, value):
     """

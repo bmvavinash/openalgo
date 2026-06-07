@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}New Metals Strategy{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="flex items-center mb-6">
+            <a href="{{ url_for('metals_bp.index') }}" class="btn btn-ghost btn-sm mr-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+            </a>
+            <h1 class="text-2xl font-bold">New Metals Strategy</h1>
+        </div>
+
+        <form method="POST" action="{{ url_for('metals_bp.new_strategy') }}" class="space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <!-- Basic Information -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Basic Information</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Strategy Name</span>
+                            </label>
+                            <input type="text" name="name" placeholder="My Gold Strategy" 
+                                   class="input input-bordered" required>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Metal Type</span>
+                            </label>
+                            <select name="metal_type" class="select select-bordered" id="metalType">
+                                {% for metal in valid_metals %}
+                                <option value="{{ metal }}">{{ metal }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Instrument Type</span>
+                            </label>
+                            <select name="instrument_type" class="select select-bordered" id="instrumentType">
+                                <option value="MCX">MCX (Commodity) — 9:00–23:30 IST</option>
+                                <option value="ETF">ETF (NSE) — 9:15–15:15 IST</option>
+                            </select>
+                            <span class="label-text-alt opacity-70">ETF closes at 3:15 PM. MCX till 11:30 PM.</span>
+                        </div>
+                        
+                        <input type="hidden" name="exchange" id="exchangeInput" value="MCX">
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Symbol</span>
+                            </label>
+                            <select name="symbol" class="select select-bordered" id="symbolSelect">
+                                <option value="GOLDM">GOLDM (Gold Mini)</option>
+                                <option value="GOLD">GOLD</option>
+                                <option value="GOLDPETAL">GOLDPETAL</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Product Type</span>
+                            </label>
+                            <select name="product_type" class="select select-bordered">
+                                <option value="MIS">MIS (Intraday)</option>
+                                <option value="NRML">NRML (Positional)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Quantity (Lots)</span>
+                            </label>
+                            <input type="number" name="quantity" value="1" min="1" 
+                                   class="input input-bordered" required>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Trading Mode</span>
+                            </label>
+                            <select name="trading_mode" class="select select-bordered">
+                                <option value="LONG">LONG Only</option>
+                                <option value="SHORT">SHORT Only</option>
+                                <option value="BOTH">BOTH</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stop Loss Configuration -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Stop Loss Configuration</h2>
+                    
+                    <div class="alert alert-info mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm"><strong>Adaptive Stop-Loss</strong> is recommended for metals trading. 
+                            It automatically adjusts based on market volatility and provides trailing protection.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Stop Loss Type</span>
+                            </label>
+                            <select name="stop_loss_type" class="select select-bordered" id="stopLossType">
+                                {% for sl_type in stop_loss_types %}
+                                <option value="{{ sl_type }}" {% if sl_type == 'ADAPTIVE' %}selected{% endif %}>
+                                    {{ sl_type }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Base Stop Loss (%)</span>
+                            </label>
+                            <input type="number" name="stop_loss_pct" value="2.0" step="0.1" min="0.5" max="10"
+                                   class="input input-bordered" id="stopLossPct">
+                        </div>
+                        
+                        <div class="form-control" id="trailingStopDiv">
+                            <label class="label">
+                                <span class="label-text">Trailing Stop (%)</span>
+                            </label>
+                            <input type="number" name="trailing_stop_pct" value="1.0" step="0.1" min="0.5" max="5"
+                                   class="input input-bordered">
+                        </div>
+                        
+                        <div class="form-control" id="atrMultiplierDiv">
+                            <label class="label">
+                                <span class="label-text">ATR Multiplier</span>
+                            </label>
+                            <input type="number" name="atr_multiplier" value="2.0" step="0.1" min="1" max="5"
+                                   class="input input-bordered">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Take Profit Configuration -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Take Profit Configuration</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label cursor-pointer">
+                                <span class="label-text">Enable Take Profit</span>
+                                <input type="checkbox" name="take_profit_enabled" checked 
+                                       class="checkbox checkbox-primary" id="takeProfitEnabled">
+                            </label>
+                        </div>
+                        
+                        <div class="form-control" id="takeProfitPctDiv">
+                            <label class="label">
+                                <span class="label-text">Take Profit (%)</span>
+                            </label>
+                            <input type="number" name="take_profit_pct" value="3.0" step="0.1" min="1" max="20"
+                                   class="input input-bordered">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Trading Hours -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Trading Hours (IST)</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Start Time</span>
+                            </label>
+                            <input type="time" name="start_time" id="startTime" value="09:00" class="input input-bordered">
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">End Time (Market Close)</span>
+                            </label>
+                            <input type="time" name="end_time" id="endTime" value="23:30" class="input input-bordered">
+                        </div>
+                    </div>
+                    
+                    <p class="text-sm opacity-70 mt-2" id="tradingHoursNote">MCX: 9:00 AM – 11:30 PM IST. ETF: 9:15 AM – 3:15 PM IST.</p>
+                </div>
+            </div>
+            
+            <!-- Sell before market close (recommended for ETF) -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Square-off before market close</h2>
+                    
+                    <div class="form-control">
+                        <label class="label cursor-pointer justify-start gap-4">
+                            <input type="checkbox" name="sell_before_market_close" id="sellBeforeClose" class="checkbox checkbox-primary">
+                            <span class="label-text font-medium">Sell before market closes</span>
+                        </label>
+                        <p class="text-sm opacity-70 mt-2">
+                            If enabled, positions will be squared off a few minutes before end time to avoid broker auto square-off and slippage.
+                        </p>
+                    </div>
+                    
+                    <div class="form-control mt-4" id="squareOffMinsDiv">
+                        <label class="label">
+                            <span class="label-text">Minutes before market close to square off</span>
+                        </label>
+                        <input type="number" name="square_off_minutes_before_close" value="15" min="5" max="60" class="input input-bordered w-32">
+                    </div>
+                    
+                    <div class="alert alert-info mt-4" id="sellBeforeCloseRecommendation">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-semibold">Recommendation</p>
+                            <p class="text-sm" id="recommendationText">
+                                <strong>ETF:</strong> Recommended to turn ON — avoids overnight risk and broker auto square-off at 3:15 PM. 
+                                <strong>MCX:</strong> Optional — you can hold till 11:30 PM; turn ON if you want to exit before session end.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Notifications -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title mb-4">Notifications</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label cursor-pointer">
+                                <span class="label-text">Telegram Alerts</span>
+                                <input type="checkbox" name="telegram_alerts" checked 
+                                       class="checkbox checkbox-primary">
+                            </label>
+                            <span class="label-text-alt opacity-70">Receive trade alerts on Telegram</span>
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label cursor-pointer">
+                                <span class="label-text">WhatsApp Alerts</span>
+                                <input type="checkbox" name="whatsapp_alerts" 
+                                       class="checkbox checkbox-primary">
+                            </label>
+                            <span class="label-text-alt opacity-70">Receive trade alerts on WhatsApp</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Submit -->
+            <div class="flex justify-end gap-4">
+                <a href="{{ url_for('metals_bp.index') }}" class="btn btn-ghost">Cancel</a>
+                <button type="submit" class="btn btn-primary">Create Strategy</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const metalType = document.getElementById('metalType');
+    const instrumentType = document.getElementById('instrumentType');
+    const symbolSelect = document.getElementById('symbolSelect');
+    const stopLossPct = document.getElementById('stopLossPct');
+    const endTime = document.getElementById('endTime');
+    const startTime = document.getElementById('startTime');
+    const exchangeInput = document.getElementById('exchangeInput');
+    const sellBeforeClose = document.getElementById('sellBeforeClose');
+    const tradingHoursNote = document.getElementById('tradingHoursNote');
+    const recommendationText = document.getElementById('recommendationText');
+    
+    const metalSymbols = {{ metal_symbols | tojson }};
+    const metalSymbolsEtf = {{ metal_symbols_etf | tojson }};
+    const marketEndEtf = '{{ market_end_time_etf }}';
+    const marketEndMcx = '{{ market_end_time_mcx }}';
+    
+    function updateSymbols() {
+        const metal = metalType.value;
+        const isEtf = instrumentType.value === 'ETF';
+        const symbols = isEtf ? (metalSymbolsEtf[metal] || []) : (metalSymbols[metal] || []);
+        
+        symbolSelect.innerHTML = '';
+        symbols.forEach(symbol => {
+            const option = document.createElement('option');
+            option.value = symbol;
+            option.textContent = symbol;
+            symbolSelect.appendChild(option);
+        });
+        
+        if (metal === 'GOLD') {
+            stopLossPct.value = isEtf ? '1.5' : '1.8';
+        } else if (metal === 'SILVER') {
+            stopLossPct.value = isEtf ? '2.0' : '2.2';
+        } else {
+            stopLossPct.value = '2.0';
+        }
+    }
+    
+    function updateInstrumentDependent() {
+        const isEtf = instrumentType.value === 'ETF';
+        exchangeInput.value = isEtf ? 'NSE' : 'MCX';
+        endTime.value = isEtf ? marketEndEtf : marketEndMcx;
+        startTime.value = isEtf ? '09:15' : '09:00';
+        tradingHoursNote.textContent = isEtf
+            ? 'ETF (NSE): 9:15 AM – 3:15 PM IST. Market closes at 3:15 PM.'
+            : 'MCX: 9:00 AM – 11:30 PM IST.';
+        
+        if (isEtf) {
+            sellBeforeClose.checked = true;
+            recommendationText.innerHTML = '<strong>ETF:</strong> <span class="text-success">Recommended ON</span> — avoids broker auto square-off at 3:15 PM and overnight risk. Square off 10–15 min before close.';
+        } else {
+            recommendationText.innerHTML = '<strong>ETF:</strong> Recommended ON. <strong>MCX:</strong> Optional — you can hold till 11:30 PM; turn ON if you want to exit before session end.';
+        }
+        
+        updateSymbols();
+    }
+    
+    metalType.addEventListener('change', updateSymbols);
+    instrumentType.addEventListener('change', updateInstrumentDependent);
+    
+    updateInstrumentDependent();
+    
+    // Toggle take profit input visibility
+    const takeProfitEnabled = document.getElementById('takeProfitEnabled');
+    const takeProfitPctDiv = document.getElementById('takeProfitPctDiv');
+    
+    takeProfitEnabled.addEventListener('change', function() {
+        takeProfitPctDiv.style.opacity = this.checked ? '1' : '0.5';
+        takeProfitPctDiv.querySelector('input').disabled = !this.checked;
+    });
+});
+</script>
+{% endblock %}

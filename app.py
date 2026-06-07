@@ -43,6 +43,7 @@ from blueprints.security import security_bp  # Import the security blueprint
 from blueprints.sandbox import sandbox_bp  # Import the sandbox blueprint
 from blueprints.playground import playground_bp  # Import the API playground blueprint
 from blueprints.strategy_performance import strategy_performance_bp  # Import the strategy performance blueprint
+from blueprints.metals import metals_bp  # Import the metals trading blueprint
 from services.telegram_bot_service import telegram_bot_service
 from database.telegram_db import get_bot_config
 
@@ -60,6 +61,7 @@ from database.latency_db import init_latency_db as ensure_latency_tables_exists
 from database.strategy_db import init_db as ensure_strategy_tables_exists
 from database.sandbox_db import init_db as ensure_sandbox_tables_exists
 from database.action_center_db import init_db as ensure_action_center_tables_exists
+from database.metals_db import init_db as ensure_metals_tables_exists
 
 from utils.plugin_loader import load_broker_auth_functions
 
@@ -123,6 +125,13 @@ def create_app():
     # Register custom Jinja2 filters
     from utils.number_formatter import format_indian_number
     app.jinja_env.filters['indian_number'] = format_indian_number
+
+    # Enable template auto-reload in debug mode for development
+    debug_mode = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')
+    if debug_mode:
+        app.config['TEMPLATES_AUTO_RELOAD'] = True
+        app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable static file caching in debug mode
+        logger.info("Template auto-reload enabled (debug mode)")
 
     # Environment variables
     app.secret_key = os.getenv('APP_KEY')
@@ -213,6 +222,7 @@ def create_app():
     app.register_blueprint(sandbox_bp)  # Register Sandbox blueprint
     app.register_blueprint(playground_bp)  # Register API playground blueprint
     app.register_blueprint(strategy_performance_bp)  # Register Strategy Performance blueprint
+    app.register_blueprint(metals_bp)  # Register Metals trading blueprint
 
 
     # Exempt webhook endpoints from CSRF protection after app initialization
@@ -398,6 +408,7 @@ def setup_environment(app):
             ('Strategy DB', ensure_strategy_tables_exists),
             ('Sandbox DB', ensure_sandbox_tables_exists),
             ('Action Center DB', ensure_action_center_tables_exists),
+            ('Metals DB', ensure_metals_tables_exists),
         ]
 
         db_init_start = time.time()
@@ -478,14 +489,41 @@ with app.app_context():
                 catchup_missed_settlements()
                 return ('catchup_settlement', True, 'Completed')
 
+            def start_mtm_updater():
+                """Start MTM updater in background thread"""
+                import threading
+                from sandbox.position_manager import update_all_positions_mtm
+                from database.sandbox_db import get_config
+                
+                def mtm_loop():
+                    mtm_interval = int(get_config('mtm_update_interval', '5'))
+                    if mtm_interval == 0:
+                        logger.info("MTM updates disabled (interval = 0)")
+                        return
+                    
+                    logger.info(f"MTM updater started (interval: {mtm_interval}s)")
+                    import time
+                    while True:
+                        try:
+                            update_all_positions_mtm()
+                            time.sleep(mtm_interval)
+                        except Exception as e:
+                            logger.error(f"MTM updater error: {e}")
+                            time.sleep(mtm_interval)
+                
+                thread = threading.Thread(target=mtm_loop, daemon=True)
+                thread.start()
+                return ('mtm_updater', True, 'Started')
+
             # Start all services in parallel
             startup_start = time.time()
-            with ThreadPoolExecutor(max_workers=3) as executor:
+            with ThreadPoolExecutor(max_workers=4) as executor:
                 # Submit all tasks
                 futures = [
                     executor.submit(start_engine),
                     executor.submit(start_scheduler),
-                    executor.submit(run_catchup)
+                    executor.submit(run_catchup),
+                    executor.submit(start_mtm_updater)
                 ]
 
                 # Collect results as they complete
@@ -504,6 +542,8 @@ with app.app_context():
                                 logger.warning(f"Failed to auto-start square-off scheduler: {message}")
                         elif service_name == 'catchup_settlement':
                             logger.info("Catch-up settlement check completed on startup")
+                        elif service_name == 'mtm_updater':
+                            logger.info("MTM updater started (background thread)")
                     except Exception as e:
                         logger.error(f"Error starting service: {e}")
 
@@ -528,7 +568,9 @@ if __name__ == '__main__':
     # Get environment variables
     host_ip = os.getenv('FLASK_HOST_IP', '127.0.0.1')  # Default to '127.0.0.1' if not set
     port = int(os.getenv('FLASK_PORT', 5000))  # Default to 5000 if not set
-    debug = os.getenv('FLASK_DEBUG', 'False').lower() in ('true', '1', 't')  # Default to False if not set
+    # Enable debug mode by default for development (auto-reload on code changes)
+    # Set FLASK_DEBUG=False to disable in production
+    debug = os.getenv('FLASK_DEBUG', 'True').lower() in ('true', '1', 't')  # Default to True for auto-reload
 
     # Log the OpenAlgo access URL with enhanced styling
     import socket
@@ -564,4 +606,18 @@ if __name__ == '__main__':
         url = f"http://{host_ip}:{port}"
         log_startup_banner(logger, "OpenAlgo is running!", url)
 
-    socketio.run(app, host=host_ip, port=port, debug=debug)
+    # Enable auto-reload in debug mode
+    # This will automatically reload the server when Python files change
+    if debug:
+        logger.info("="*60)
+        logger.info("DEBUG MODE ENABLED - AUTO-RELOAD ACTIVE")
+        logger.info("="*60)
+        logger.info("The server will automatically reload when Python files change.")
+        logger.info("Set FLASK_DEBUG=False to disable auto-reload")
+        logger.info("="*60)
+        # Flask-SocketIO reloader: use_reloader=True enables file watching
+        # Note: Reloader may have limitations with threading mode
+        # If reloader doesn't work, try: python run_with_reload.py
+        socketio.run(app, host=host_ip, port=port, debug=debug, use_reloader=True, allow_unsafe_werkzeug=True)
+    else:
+        socketio.run(app, host=host_ip, port=port, debug=debug, use_reloader=False)

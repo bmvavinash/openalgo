@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Backtest - {{ strategy.name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <a href="{{ url_for('metals_bp.view_strategy', strategy_id=strategy.id) }}" class="btn btn-ghost btn-sm mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+            </a>
+            <h1 class="text-2xl font-bold">Run Backtest</h1>
+            <p class="text-base-content/70 mt-1">{{ strategy.name }} ({{ strategy.metal_type }})</p>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl max-w-2xl">
+        <div class="card-body">
+            <h2 class="card-title">Backtest Parameters</h2>
+            <form method="POST" action="{{ url_for('metals_bp.run_backtest', strategy_id=strategy.id) }}" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Start Date</span></label>
+                    <input type="date" name="start_date" value="{{ start_date }}" class="input input-bordered" required>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">End Date</span></label>
+                    <input type="date" name="end_date" value="{{ end_date }}" class="input input-bordered" required>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Timeframe</span></label>
+                    <select name="timeframe" class="select select-bordered">
+                        <option value="1m">1 minute</option>
+                        <option value="5m" selected>5 minutes</option>
+                        <option value="15m">15 minutes</option>
+                        <option value="1h">1 hour</option>
+                        <option value="1d">1 day</option>
+                    </select>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">Run Backtest</button>
+                    <a href="{{ url_for('metals_bp.view_strategy', strategy_id=strategy.id) }}" class="btn btn-ghost">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

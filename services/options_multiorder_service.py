@@ -170,8 +170,8 @@ def resolve_and_place_leg(
 
 def process_multiorder_with_auth(
     multiorder_data: Dict[str, Any],
-    auth_token: str,
-    broker: str,
+    auth_token: Optional[str],
+    broker: Optional[str],
     api_key: str,
     original_data: Dict[str, Any]
 ) -> Tuple[bool, Dict[str, Any], int]:
@@ -369,6 +369,28 @@ def place_options_multiorder(
 
     # Case 1: API-based authentication
     if api_key and not (auth_token and broker):
+        # Check if in analyze/paper trading mode - allow without broker auth
+        analyze_mode = get_analyze_mode()
+        
+        if analyze_mode:
+            # In paper trading mode, verify API key but don't require broker auth
+            from database.auth_db import verify_api_key
+            user_id = verify_api_key(api_key)
+            if not user_id:
+                logger.error(f"Invalid API key in paper trading mode: {api_key[:10] if api_key else 'None'}...")
+                error_response = {
+                    'status': 'error',
+                    'message': 'Invalid openalgo apikey. Please check your API key configuration.'
+                }
+                return False, error_response, 403
+            
+            # API key is valid - route to sandbox (paper trading)
+            logger.info(f"Paper trading mode: API key valid for user_id={user_id}, routing to sandbox")
+            # Process multiorder in sandbox mode - call process_multiorder_with_auth with None auth
+            # This will route individual orders to sandbox via place_order service
+            return process_multiorder_with_auth(multiorder_data, None, None, api_key, original_data)
+        
+        # Live trading mode - require broker authentication
         # Check if order should be routed to Action Center
         from services.order_router_service import should_route_to_pending, queue_order
 

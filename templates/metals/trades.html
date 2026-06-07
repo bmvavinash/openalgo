@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Metals Trade History{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <a href="{{ url_for('metals_bp.index') }}" class="btn btn-ghost btn-sm mb-2">Back</a>
+            <h1 class="text-2xl font-bold">Metals Trade History</h1>
+            <p class="text-base-content/70 mt-1">All gold and silver trades</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-title">Total Trades</div>
+            <div class="stat-value">{{ total_trades }}</div>
+        </div>
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-title">Winning Trades</div>
+            <div class="stat-value text-success">{{ winning_trades }}</div>
+        </div>
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-title">Win Rate</div>
+            <div class="stat-value">{{ "%.1f"|format(win_rate) }}%</div>
+        </div>
+        <div class="stat bg-base-100 rounded-lg shadow">
+            <div class="stat-title">Total P&L</div>
+            <div class="stat-value">Rs {{ "%.2f"|format(total_pnl) }}</div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">All Trades</h2>
+            {% if trades %}
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>Metal</th>
+                            <th>Symbol</th>
+                            <th>Action</th>
+                            <th>Entry</th>
+                            <th>Exit</th>
+                            <th>P&L</th>
+                            <th>Exit Reason</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trade in trades %}
+                        <tr>
+                            <td><span class="badge badge-warning">{{ trade.metal_type }}</span></td>
+                            <td>{{ trade.symbol or 'N/A' }}</td>
+                            <td>{{ trade.action }}</td>
+                            <td>Rs {{ "%.2f"|format(trade.entry_price) }}</td>
+                            <td>Rs {{ "%.2f"|format(trade.exit_price or 0) }}</td>
+                            <td>Rs {{ "%.2f"|format(trade.pnl or 0) }}</td>
+                            <td>{{ trade.exit_reason or 'Open' }}</td>
+                            <td>{{ trade.entry_time.strftime('%Y-%m-%d %H:%M') if trade.entry_time else 'N/A' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-base-content/70">No trades yet.</p>
+            <a href="{{ url_for('metals_bp.new_strategy') }}" class="btn btn-primary btn-sm mt-4">Create Strategy</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

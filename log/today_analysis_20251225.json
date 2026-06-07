@@ -1,0 +1,85 @@
+{
+  "analysis_date": "2025-12-25T19:43:52.516277",
+  "results": [
+    {
+      "strategy": "EMA Crossover NIFTY",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Multi Indicator Strategy",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "EMA SL Crossover",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Macd",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "RSI strategy",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Bear Put Spread",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Bull Call Spread",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Intraday EMA Crossover",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Calendar Spread",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Covered Call",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Iron Butterfly",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Iron Condor",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Protective Put",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Straddle",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Option Strangle",
+      "triggered": false,
+      "reason": "No historical data available"
+    },
+    {
+      "strategy": "Run Parallel Option Strategies",
+      "triggered": false,
+      "reason": "No historical data available"
+    }
+  ]
+}

@@ -59,9 +59,17 @@ def place_bull_call_spread():
             position_open = True
             print(f"[{datetime.now()}] {strategy_name} opened successfully")
             print(f"Results: {len(response.get('results', []))} legs executed")
-            for leg in response.get('results', []):
-                print(f"  Leg {leg.get('leg')}: {leg.get('action')} {leg.get('option_type')} "
-                      f"{leg.get('offset')} - {leg.get('status')} - {leg.get('orderid')}")
+                        for leg in response.get('results', []):
+                leg_status = leg.get('status', 'unknown')
+                leg_orderid = leg.get('orderid', 'N/A')
+                leg_message = leg.get('message', '')
+                if leg_status == 'success':
+                    print(f"  Leg {leg.get('leg')}: {leg.get('action')} {leg.get('option_type')} "
+                          f"{leg.get('offset')} - {leg_status} - OrderID: {leg_orderid}")
+                else:
+                    error_msg = leg_message or 'Unknown error'
+                    print(f"  Leg {leg.get('leg')}: {leg.get('action')} {leg.get('option_type')} "
+                          f"{leg.get('offset')} - {leg_status} - Error: {error_msg}")
             return True
         else:
             print(f"[{datetime.now()}] {strategy_name} failed: {response.get('message', 'Unknown error')}")

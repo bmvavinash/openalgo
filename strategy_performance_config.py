@@ -246,3 +246,9 @@ class StrategyPerformanceConfig:
         
         return category in allowed_categories
 
+
+
+
+
+
+

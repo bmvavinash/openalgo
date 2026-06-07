@@ -43,3 +43,11 @@
 4. Run backtest analysis again to confirm options strategies are working
 
 
+
+
+
+
+
+
+
+

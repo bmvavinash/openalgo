@@ -461,7 +461,15 @@ def get_broker_name(provided_api_key):
                 broker_cache[provided_api_key] = auth_obj.broker
                 return auth_obj.broker
             else:
-                logger.warning(f"No valid broker found for user_id '{user_id}'.")
+                # In paper trading mode, this is expected - use debug level
+                try:
+                    from database.settings_db import get_analyze_mode
+                    if get_analyze_mode():
+                        logger.debug(f"No valid broker found for user_id '{user_id}' (expected in paper trading mode).")
+                    else:
+                        logger.warning(f"No valid broker found for user_id '{user_id}'.")
+                except:
+                    logger.warning(f"No valid broker found for user_id '{user_id}'.")
                 return None
         except Exception as e:
             logger.error(f"Error while querying the database for broker name: {e}")
@@ -522,7 +530,15 @@ def get_auth_token_broker(provided_api_key, include_feed_token=False):
                 logger.debug(f"Auth token cached for user_id: {user_id}")
                 return result
             else:
-                logger.warning(f"No valid auth token or broker found for user_id '{user_id}'.")
+                # In paper trading mode, this is expected - use debug level
+                try:
+                    from database.settings_db import get_analyze_mode
+                    if get_analyze_mode():
+                        logger.debug(f"No valid auth token or broker found for user_id '{user_id}' (expected in paper trading mode).")
+                    else:
+                        logger.warning(f"No valid auth token or broker found for user_id '{user_id}'.")
+                except:
+                    logger.warning(f"No valid auth token or broker found for user_id '{user_id}'.")
                 return (None, None, None) if include_feed_token else (None, None)
         except Exception as e:
             logger.error(f"Error while querying the database for auth token and broker: {e}")
