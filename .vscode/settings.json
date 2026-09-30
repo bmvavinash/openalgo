@@ -1,0 +1,42 @@
+{
+  "git.defaultCloneDirectory": "C:\\Users\\U1119162\\Learning\\Openalgo",
+  "git.enableCommitSigning": false,
+  "git.inputValidationSubjectLength": 72,
+
+  "terminal.integrated.env.windows": {
+    "GIT_AUTHOR_NAME": "bmvavinash",
+    "GIT_AUTHOR_EMAIL": "bmvavinash98@gmail.com",
+    "GIT_COMMITTER_NAME": "bmvavinash",
+    "GIT_COMMITTER_EMAIL": "bmvavinash98@gmail.com"
+  },
+
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[python]": { "editor.defaultFormatter": "ms-python.black-formatter" },
+
+  "files.associations": {
+    "*.env.example": "properties"
+  },
+
+  "editor.rulers": [100],
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
+  "eslint.workingDirectories": ["ai-trading-server"],
+  "npm.packageManager": "npm",
+
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.js": "${capture}.test.js",
+    "package.json": "package-lock.json, .npmrc, .nvmrc"
+  },
+
+  "workbench.colorTheme": "GitHub Dark Default",
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#1a1f2e",
+    "titleBar.activeForeground": "#58a6ff",
+    "statusBar.background": "#1a1f2e",
+    "statusBar.foreground": "#58a6ff"
+  }
+}

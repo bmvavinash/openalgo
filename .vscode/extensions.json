@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "ms-python.python",
+    "ms-python.black-formatter",
+    "github.copilot",
+    "github.vscode-pull-request-github",
+    "mongodb.mongodb-vscode",
+    "humao.rest-client",
+    "mikestead.dotenv",
+    "PKief.material-icon-theme"
+  ]
+}
