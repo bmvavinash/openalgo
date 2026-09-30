@@ -1,0 +1,43 @@
+{
+  "name": "openalgo-trading-server",
+  "version": "1.0.0",
+  "description": "OpenAlgo AI Trading Server — equity, options, IPO strategies with Anthropic AI",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "test:strategies": "node tests/strategies.test.js",
+    "test:ai": "node tests/ai.test.js",
+    "seed": "node scripts/seed.js",
+    "migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "express-rate-limit": "^7.4.0",
+    "express-validator": "^7.2.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.8.0",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
+    "socket.io": "^4.8.1",
+    "technicalindicators": "^3.1.0",
+    "uuid": "^11.0.3",
+    "winston": "^3.17.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.7"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
