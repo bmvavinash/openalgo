@@ -8,13 +8,17 @@ import { RSIBull, RSIBear } from './equity/intraday/RSIStrategy.js';
 import { VWAPBull, VWAPBear } from './equity/intraday/VWAPStrategy.js';
 import { ORBBull, ORBBear } from './equity/intraday/ORBStrategy.js';
 import { MomentumBull, MomentumBear } from './equity/intraday/MomentumStrategy.js';
+import { SuperTrendBull, SuperTrendBear } from './equity/intraday/SuperTrend.js';
+import { CPRBull, CPRBear } from './equity/intraday/CPRStrategy.js';
 import { GoldenCross, DeathCross } from './equity/positional/GoldenCross.js';
 import { TrendFollowingBull, TrendFollowingBear } from './equity/positional/TrendFollowing.js';
 import { SwingTradingBull, SwingTradingBear } from './equity/positional/SwingTrading.js';
+import { EMADivergenceBull, EMADivergenceBear } from './equity/positional/EMADivergence.js';
 import { BullCallSpread } from './options/bullish/BullCallSpread.js';
 import { BearPutSpread } from './options/bearish/BearPutSpread.js';
 import { IronCondor } from './options/neutral/IronCondor.js';
 import { ShortStraddle, LongStraddle } from './options/neutral/Straddle.js';
+import { ShortStrangle } from './options/neutral/ShortStrangle.js';
 import { IPOAnalyzer } from './ipo/IPOAnalyzer.js';
 import { ListingDayStrategy } from './ipo/ListingDayStrategy.js';
 
@@ -36,6 +40,10 @@ register(ORBBull);
 register(ORBBear);
 register(MomentumBull);
 register(MomentumBear);
+register(SuperTrendBull);
+register(SuperTrendBear);
+register(CPRBull);
+register(CPRBear);
 
 // ── Equity Positional ─────────────────────────────────────────────────────────
 register(GoldenCross);
@@ -44,6 +52,8 @@ register(TrendFollowingBull);
 register(TrendFollowingBear);
 register(SwingTradingBull);
 register(SwingTradingBear);
+register(EMADivergenceBull);
+register(EMADivergenceBear);
 
 // ── Options ───────────────────────────────────────────────────────────────────
 register(BullCallSpread);
@@ -51,6 +61,7 @@ register(BearPutSpread);
 register(IronCondor);
 register(ShortStraddle);
 register(LongStraddle);
+register(ShortStrangle);
 
 // ── IPO ───────────────────────────────────────────────────────────────────────
 register(ListingDayStrategy);

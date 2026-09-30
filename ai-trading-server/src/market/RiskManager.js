@@ -41,15 +41,70 @@ export class RiskManager {
   }
 
   /**
-   * Kelly-criterion-capped position sizing.
-   * Risk = capital × riskPercent → Qty = Risk / (entry - stopLoss)
+   * Quarter-Kelly position sizing.
+   * Uses strategy win rate + R:R to compute Kelly fraction, applies 1/4 Kelly for safety.
+   * Caps at 5% of capital per trade, floors at 0.5%.
+   *
+   * @param {number} entryPrice
+   * @param {number} stopLoss
+   * @param {number} winRate    0.0–1.0, default 0.55
+   * @param {number} rrRatio    reward:risk ratio, default 2.0
    */
-  _sizePosition(entryPrice, stopLoss) {
+  _sizePosition(entryPrice, stopLoss, winRate = 0.55, rrRatio = 2.0) {
     if (!this.capitalTotal || !stopLoss || !entryPrice) return null;
-    const riskAmount = this.capitalTotal * (this.riskPerTrade / 100);
     const riskPerShare = Math.abs(entryPrice - stopLoss);
     if (riskPerShare <= 0) return null;
-    return Math.floor(riskAmount / riskPerShare);
+
+    // Kelly fraction: f* = (b×p - q) / b
+    const b = Math.max(rrRatio, 0.5);
+    const p = Math.min(Math.max(winRate, 0.3), 0.9);
+    const q = 1 - p;
+    const kelly = (b * p - q) / b;
+    const quarterKelly = Math.max(0, kelly / 4);
+
+    // Cap between 0.5% and 5% of capital
+    const riskPct    = Math.min(0.05, Math.max(0.005, quarterKelly));
+    const riskAmount = this.capitalTotal * riskPct;
+    return Math.max(1, Math.floor(riskAmount / riskPerShare));
+  }
+
+  /**
+   * Compute trailing stop level for an open position.
+   * ATR-based: trail = peakPrice - (multiplier × ATR)
+   * @param {object} position — { direction, entryPrice, highestPrice, atr }
+   * @param {number} multiplier — default 2.0
+   */
+  computeTrailingStop(position, multiplier = 2.0) {
+    const { direction, entryPrice, highestPrice, lowestPrice, atr } = position;
+    if (!atr || atr <= 0) return null;
+
+    if (direction === 'LONG') {
+      const peak = highestPrice || entryPrice;
+      const trail = peak - multiplier * atr;
+      return Math.max(trail, entryPrice - multiplier * atr);  // never go below initial SL zone
+    } else {
+      const trough = lowestPrice || entryPrice;
+      const trail = trough + multiplier * atr;
+      return Math.min(trail, entryPrice + multiplier * atr);
+    }
+  }
+
+  /**
+   * Step-based trailing: lock in profit at breakeven (+1×ATR), then trail to +0.5×ATR.
+   */
+  computeStepTrail(direction, entryPrice, currentPrice, initialSL, atr) {
+    const moved = direction === 'LONG' ? currentPrice - entryPrice : entryPrice - currentPrice;
+    if (moved >= 2 * atr) {
+      // Lock in +0.5× ATR profit
+      return direction === 'LONG'
+        ? currentPrice - 1.5 * atr
+        : currentPrice + 1.5 * atr;
+    }
+    if (moved >= atr) {
+      // Move to breakeven
+      return direction === 'LONG' ? entryPrice : entryPrice;
+    }
+    return initialSL;
   }
 
   async _checkOpenPositions(userId) {

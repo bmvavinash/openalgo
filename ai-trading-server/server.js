@@ -6,6 +6,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import cron from 'node-cron';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import { config } from './src/config/index.js';
 import { logger } from './src/config/logger.js';
@@ -33,6 +37,9 @@ async function bootstrap() {
   app.use(morgan(config.server.isDev ? 'dev' : 'combined', {
     stream: { write: msg => logger.info(msg.trim()) },
   }));
+
+  // Serve dashboard UI
+  app.use(express.static(join(__dirname, 'public')));
 
   // Rate limiting
   app.use('/api/', rateLimit({
