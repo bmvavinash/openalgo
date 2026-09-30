@@ -5,6 +5,7 @@ import positionsRoutes from './routes/positions.js';
 import aiRoutes from './routes/ai.js';
 import ipoRoutes from './routes/ipo.js';
 import marketRoutes from './routes/market.js';
+import alertsRoutes from './routes/alerts.js';
 
 const router = Router();
 
@@ -14,6 +15,7 @@ router.use('/positions',  positionsRoutes);
 router.use('/ai',         aiRoutes);
 router.use('/ipo',        ipoRoutes);
 router.use('/market',     marketRoutes);
+router.use('/alerts',     alertsRoutes);
 
 // Health check
 router.get('/health', (req, res) => {

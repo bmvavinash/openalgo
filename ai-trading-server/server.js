@@ -83,10 +83,38 @@ async function bootstrap() {
   const mdService = new MarketDataService();
   const posMgr    = new PositionManager();
 
+  // Simulated quote generator — deterministic ticks so the UI feels live in dev
+  const QUOTE_BASE = {
+    NIFTY: 22500, BANKNIFTY: 48200, FINNIFTY: 21300, SENSEX: 74000,
+    RELIANCE: 2920, TCS: 4350, INFY: 1870, HDFCBANK: 1720, ICICIBANK: 1290,
+    WIPRO: 595, BHARTIARTL: 1850, LT: 3680, SBIN: 840, KOTAKBANK: 1950,
+    AXISBANK: 1190, BAJFINANCE: 7450, MARUTI: 13200, TATAMOTORS: 1020,
+    TITAN: 3680, NESTLEIND: 2450, SUNPHARMA: 1890, ITC: 495, HCLTECH: 1920,
+    TECHM: 1680, COALINDIA: 500, NTPC: 395, POWERGRID: 335,
+  };
+
+  function genQuote(sym) {
+    const base = QUOTE_BASE[sym] || (500 + Math.abs(sym.charCodeAt(0) * 7) % 2000);
+    const seed = (Date.now() / 5000 | 0) + sym.charCodeAt(0);
+    const pct = Math.sin(seed) * 0.003 + Math.cos(seed * 1.7) * 0.002;
+    const ltp = parseFloat((base * (1 + pct)).toFixed(2));
+    const change = parseFloat((ltp - base).toFixed(2));
+    return {
+      symbol: sym, ltp, change,
+      changePct: parseFloat(((change / base) * 100).toFixed(2)),
+      high: parseFloat((ltp * 1.008).toFixed(2)),
+      low: parseFloat((ltp * 0.992).toFixed(2)),
+      volume: Math.floor((Math.abs(Math.sin(seed * 3)) * 900000) + 100000),
+    };
+  }
+
+  // Track per-socket watchlist subscriptions
+  const watchlistSubs = new Map(); // socketId → [symbol, ...]
+
   io.on('connection', socket => {
     logger.debug(`WS client connected: ${socket.id}`);
 
-    socket.on('subscribe:quote', async ({ symbol, exchange }) => {
+    socket.on('subscribe:quote', ({ symbol, exchange }) => {
       socket.join(`quote:${symbol}`);
       logger.debug(`WS subscribe quote: ${symbol}`);
     });
@@ -95,12 +123,42 @@ async function bootstrap() {
       socket.join(`positions:${userId}`);
     });
 
+    // Client subscribes to a watchlist of symbols for live ticks
+    socket.on('subscribe:watchlist', ({ symbols }) => {
+      if (!Array.isArray(symbols)) return;
+      const clean = symbols.map(s => String(s).toUpperCase().slice(0, 20)).slice(0, 30);
+      watchlistSubs.set(socket.id, clean);
+      logger.debug(`WS watchlist [${socket.id}]: ${clean.join(',')}`);
+      // Immediately emit first tick
+      socket.emit('watchlist:update', {
+        quotes: clean.map(genQuote),
+        ts: Date.now(),
+      });
+    });
+
+    socket.on('unsubscribe:watchlist', () => {
+      watchlistSubs.delete(socket.id);
+    });
+
     socket.on('disconnect', () => {
+      watchlistSubs.delete(socket.id);
       logger.debug(`WS client disconnected: ${socket.id}`);
     });
   });
 
-  // Broadcast live quotes every 15s during market hours
+  // Push watchlist ticks every 5s to subscribed clients
+  setInterval(() => {
+    watchlistSubs.forEach((symbols, socketId) => {
+      const sock = io.sockets.sockets.get(socketId);
+      if (!sock) { watchlistSubs.delete(socketId); return; }
+      sock.emit('watchlist:update', {
+        quotes: symbols.map(genQuote),
+        ts: Date.now(),
+      });
+    });
+  }, 5000);
+
+  // Broadcast live indices every 15s during market hours
   setInterval(async () => {
     if (!mdService.isMarketOpen()) return;
     try {
